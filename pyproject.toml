@@ -1,0 +1,60 @@
+[tool.poetry]
+name = "gifsync-api"
+version = "0.1.0"
+description = "Flask API backend for GifSync"
+license = "MIT"
+authors = ["Carson Mullins <septem151@protonmail.com>"]
+readme = "README.rst"
+homepage = "https://github.com/Septem151/GifSync-API"
+repository = "https://github.com/Septem151/GifSync-API"
+keywords = ["flask", "gifsync"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Flask",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed"
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+python-dotenv = "^0.17.1"
+Flask = "^1.1.4"
+Flask-Cors = "^3.0.10"
+flask-pyjwt = "^0.1.8" 
+requests = "^2.25.1"
+redis = "^3.5.3"
+rq = "^1.8.1"
+psycopg2 = { version = "^2.9", optional = true }
+psycopg2-binary = { version = "^2.9", optional = true }
+Flask-SQLAlchemy = "^2.5.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+mypy = "^0.812"
+black = "^21.5b1"
+pylint = "^2.8.2"
+isort = "^5.8.0"
+Sphinx = "^4.0.1"
+
+[tool.poetry.extras]
+production = ["psycopg2"]
+development = ["psycopg2-binary"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.pylint.design]
+max-args = 6
+
+[tool.pylint.messages_control]
+# Disable bad-continuation, bad-whitespace, missing-module-docstring
+disable = "C0330, C0326"
+# C0114
+
+[tool.pylint.format]
+max-line-length = "88"
