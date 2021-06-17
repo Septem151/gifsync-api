@@ -54,7 +54,6 @@ max-args = 6
 [tool.pylint.messages_control]
 # Disable bad-continuation, bad-whitespace, missing-module-docstring
 disable = "C0330, C0326"
-# C0114
 
 [tool.pylint.format]
 max-line-length = "88"
