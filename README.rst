@@ -56,3 +56,5 @@ Please lint your code with black, mypy, and pylint:
     poetry run mypy .
     poetry run pylint gifsync_api/ tests/ doc/
 
+Please use type annotations for function signatures as often as possible. Docstring
+style is Google with Napoleon Sphinx-style references.
