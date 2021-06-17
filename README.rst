@@ -10,7 +10,7 @@ Installation
 
 gifsync-api is built with poetry. If you've never used poetry before, install it with:
 
-..code-block:: console
+.. code-block:: console
 
     pip install --user poetry
 
