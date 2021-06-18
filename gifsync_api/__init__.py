@@ -27,7 +27,6 @@ def create_app(
     app = Flask(__name__)
     app.config.from_object(Config(config_type))
     register_extensions(app)
-    print(app.config["DOMAIN"])
     return app
 
 
