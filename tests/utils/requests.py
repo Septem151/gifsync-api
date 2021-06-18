@@ -157,3 +157,27 @@ def get_user(
     else:
         response = client.get(f"/users/{username}")
     return response
+
+
+def post_user(
+    client: FlaskClient, username: str, auth_token: t.Optional[str] = None
+) -> Response:
+    """POST /users/<username>
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        username (:obj:`str`): The username of the User to retrieve.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    # TODO: Need to rework this request function.
+    if auth_token:
+        response: Response = client.post(
+            f"/users/{username}", headers={"Authorization": f"Bearer {auth_token}"}
+        )
+    else:
+        response = client.post(f"/users/{username}")
+    return response

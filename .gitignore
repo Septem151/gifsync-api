@@ -123,3 +123,7 @@ id_rsa*
 # Environment Variables
 .env*
 !.env.sample
+
+# Docker Development and Testing setup for Postgres/Redis
+docker-compose.yml
+initdb.sh

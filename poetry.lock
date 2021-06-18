@@ -426,6 +426,21 @@ mccabe = ">=0.6,<0.7"
 toml = ">=0.7.1"
 
 [[package]]
+name = "pylint-flask-sqlalchemy"
+version = "0.2.0"
+description = "A Pylint plugin for improving code analysis when editing code using Flask-SQLAlchemy"
+category = "dev"
+optional = false
+python-versions = ">=3.5"
+
+[package.dependencies]
+Flask-SQLAlchemy = ">=2"
+pylint = "*"
+
+[package.extras]
+dev = ["black", "bump2version", "gitchangelog", "pystache", "mypy"]
+
+[[package]]
 name = "pyparsing"
 version = "2.4.7"
 description = "Python parsing module"
@@ -744,7 +759,7 @@ production = ["psycopg2"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "8ab1f45287b3dbbb152b8e125fe94149db32ae364fdb15e49046d760b5c8c735"
+content-hash = "cfe7da0a459c652da7d0d7d5dfe46f1262bf414f021d99428c51168c5a4fe510"
 
 [metadata.files]
 alabaster = [
@@ -1116,6 +1131,10 @@ pyjwt = [
 pylint = [
     {file = "pylint-2.8.3-py3-none-any.whl", hash = "sha256:792b38ff30903884e4a9eab814ee3523731abd3c463f3ba48d7b627e87013484"},
     {file = "pylint-2.8.3.tar.gz", hash = "sha256:0a049c5d47b629d9070c3932d13bff482b12119b6a241a93bc460b0be16953c8"},
+]
+pylint-flask-sqlalchemy = [
+    {file = "pylint_flask_sqlalchemy-0.2.0-py3-none-any.whl", hash = "sha256:27f1fffb940adc9ac8f00ff7eb91ec39ca070c0f3bcec0d7f1c702a993d40505"},
+    {file = "pylint_flask_sqlalchemy-0.2.0.tar.gz", hash = "sha256:8ede5baba1a465d8ba39d8383ffcf0889d7a6afeff44bd24177fcf529ba8aa81"},
 ]
 pyparsing = [
     {file = "pyparsing-2.4.7-py2.py3-none-any.whl", hash = "sha256:ef9d7589ef3c200abe66653d3f1ab1033c3c419ae9b9bdb1240a85b024efc88b"},

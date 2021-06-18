@@ -7,6 +7,7 @@ from flask.testing import FlaskClient
 from flask_sqlalchemy import SQLAlchemy
 from gifsync_api import create_app
 from gifsync_api.extensions import db
+from gifsync_api.models import Gif, User  # pylint: disable=unused-import
 
 
 @pytest.fixture(name="app", scope="session")
@@ -58,6 +59,9 @@ def fixture_db_session(database: SQLAlchemy):
 
     Args:
         db (:obj:`~flask_sqlalchemy.SQLAlchemy`): The Flask database fixture.
+
+    Yields:
+        SQLAlchemy scoped_session.
     """
     connection = database.engine.connect()
     transaction = connection.begin()

@@ -5,7 +5,6 @@ from http import HTTPStatus
 
 from flask.testing import FlaskClient
 from gifsync_api.extensions import auth_manager
-from sqlalchemy.orm.scoping import scoped_session as Session
 
 from .utils.assertion import assert_error_response, assert_user_in_response
 from .utils.generation import (
@@ -13,19 +12,16 @@ from .utils.generation import (
     create_random_username,
     populate_database_with_users,
 )
-from .utils.requests import delete_users, get_user, get_users, post_users
+from .utils.requests import delete_users, get_user, get_users, post_user, post_users
 
 
-def test_allows_admin_to_get_all_users(
-    client: FlaskClient, db_session: Session
-) -> None:
+def test_allows_admin_to_get_all_users(client: FlaskClient, db_session) -> None:
     """Assert that the GifSync API will respond with a list of users when GET /users
     is requested with an auth token owned by an admin.
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
-        db_session (:obj:`~sqlalchemy.orm.scoping.Session`): The Database Session
-            fixture.
+        db_session: The Database session fixture.
     """
     populate_database_with_users(db_session)
     auth_token = auth_manager.auth_token("test", scope={"admin": True})
@@ -75,12 +71,7 @@ def test_allows_post_to_users_with_matching_auth_token(client: FlaskClient) -> N
     auth_token = auth_manager.auth_token(username)
     response = post_users(client, auth_token.signed, username)
     assert response.status_code == HTTPStatus.CREATED
-    json_data: t.Optional[dict] = response.get_json()
-    assert json_data is not None
-    assert "username" in json_data
-    assert json_data["username"] == username
-    assert "gifs" in json_data
-    assert isinstance(json_data["gifs"], list)
+    assert_user_in_response(response)
 
 
 def test_allows_admin_to_post_any_users(client: FlaskClient) -> None:
@@ -95,12 +86,7 @@ def test_allows_admin_to_post_any_users(client: FlaskClient) -> None:
     auth_token = auth_manager.auth_token(admin_username, scope={"admin": True})
     response = post_users(client, auth_token.signed, username)
     assert response.status_code == HTTPStatus.CREATED
-    json_data: t.Optional[dict] = response.get_json()
-    assert json_data is not None
-    assert "username" in json_data
-    assert json_data["username"] == username
-    assert "gifs" in json_data
-    assert isinstance(json_data["gifs"], list)
+    assert_user_in_response(response)
 
 
 def test_rejects_post_to_users_with_mismatching_auth_token(client: FlaskClient) -> None:
@@ -171,16 +157,13 @@ def test_rejects_post_to_users_with_missing_args(client: FlaskClient) -> None:
     assert_error_response(response, HTTPStatus.BAD_REQUEST)
 
 
-def test_allows_admin_to_delete_all_users(
-    client: FlaskClient, db_session: Session
-) -> None:
+def test_allows_admin_to_delete_all_users(client: FlaskClient, db_session) -> None:
     """Assert that the GifSync API will respond with 204 No Response when DELETE /users
     is requested by an admin.
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
-        db_session (:obj:`~sqlalchemy.orm.scoping.Session`): The Database Session
-            fixture.
+        db_session: The Database session fixture.
     """
     username = create_random_username()
     populate_database_with_users(db_session)
@@ -217,7 +200,7 @@ def test_rejects_unauthenticated_from_deleting_all_users(
 
 
 def test_allows_getting_user_by_id_with_matching_auth_token(
-    client: FlaskClient, db_session: Session
+    client: FlaskClient, db_session
 ) -> None:
     """Assert that the GifSync API will respond with a user's username and their gifs
     when GET /user/<username> is requested when the auth token's "sub" matches the
@@ -225,8 +208,7 @@ def test_allows_getting_user_by_id_with_matching_auth_token(
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
-        db_session (:obj:`~sqlalchemy.orm.scoping.Session`): The Database Session
-            fixture.
+        db_session: The Database session fixture.
     """
     username = create_random_username()
     populate_database_with_users(db_session, username)
@@ -236,16 +218,13 @@ def test_allows_getting_user_by_id_with_matching_auth_token(
     assert_user_in_response(response)
 
 
-def test_allows_admin_to_get_any_user_by_id(
-    client: FlaskClient, db_session: Session
-) -> None:
+def test_allows_admin_to_get_any_user_by_id(client: FlaskClient, db_session) -> None:
     """Assert that the GifSync API will respond with a user's username and their figs
     when GET /user/<username> is requested by an admin.
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
-        db_session (:obj:`~sqlalchemy.orm.scoping.Session`): The Database Session
-            fixture.
+        db_session: The Database session fixture.
     """
     username = create_random_username()
     admin_username = create_random_username()
@@ -317,18 +296,35 @@ def test_rejects_unauthenticated_getting_user_by_id(client: FlaskClient) -> None
 
 
 def test_responds_404_when_getting_user_by_nonexistent_id(
-    client: FlaskClient, db_session: Session
+    client: FlaskClient, db_session
 ) -> None:
     """Assert that the GifSync API will respond with 404 Not Found and an error message
     when GET /users/<username> is requested for a username that doesn't exist.
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
-        db_session (:obj:`~sqlalchemy.orm.scoping.Session`): The Database Session
-            fixture.
+        db_session: The Database session fixture.
     """
     populate_database_with_users(db_session)
     username = create_random_username()
     auth_token = auth_manager.auth_token(username)
     response = get_user(client, username, auth_token)
     assert_error_response(response, HTTPStatus.NOT_FOUND)
+
+
+def test_allows_post_to_user_by_id_with_matching_auth_token(
+    client: FlaskClient, db_session
+) -> None:
+    """Assert that the GifSync API will respond with 200 OK and a user object when
+    POST /users/<username> is requested by a user with the same username.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    # TODO: Test not complete, need to rework the post_user function
+    username = create_random_username()
+    populate_database_with_users(db_session, username)
+    auth_token = auth_manager.auth_token(username)
+    response = post_user(client, username, auth_token)
+    assert response.status_code == HTTPStatus.OK

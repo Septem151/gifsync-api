@@ -3,7 +3,6 @@ import typing as t
 import uuid
 
 from flask_pyjwt import JWT, AuthData, AuthManager, TokenType
-from sqlalchemy.orm.scoping import scoped_session as Session
 
 
 def create_random_username() -> str:
@@ -72,12 +71,11 @@ def create_expired_refresh_token(auth_manager: AuthManager, username: str) -> JW
 
 
 def populate_database_with_users(
-    db_session: Session, extra_username: t.Optional[str] = None
+    db_session, extra_username: t.Optional[str] = None
 ) -> None:
     """Populates the test database with fake users.
 
     Args:
-        db_session (:obj:`~sqlalchemy.orm.scoping.Session`): The Database Session
-            fixture.
+        db_session: The Database session fixture.
     """
     # TODO: Write this function.

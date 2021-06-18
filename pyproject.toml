@@ -36,6 +36,7 @@ black = "^21.5b1"
 pylint = "^2.8.2"
 isort = "^5.8.0"
 Sphinx = "^4.0.1"
+pylint-flask-sqlalchemy = "^0.2.0"
 
 [tool.poetry.extras]
 production = ["psycopg2"]
@@ -47,6 +48,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
+
+[tool.pylint.master]
+load-plugins = "pylint_flask_sqlalchemy"
 
 [tool.pylint.design]
 max-args = 6
