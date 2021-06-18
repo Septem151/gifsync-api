@@ -36,6 +36,79 @@ You must be running Redis and Postgres. Change the ``REDIS_URL`` and
 A sample environment file is ``.env.sample``. Copy this file to either ``.env.development``,
 ``.env.testing``, ``.env.production`` depending on how you want to run the app.
 
+A quick and easy way to set up redis db, postgres db, and adminer (for querying postgres)
+is to use Docker and docker-compose. For example, the following ``docker-compose.yml`` file::
+
+    version: "3.9"
+    services:
+    adminer:
+        image: adminer
+        restart: always
+        ports:
+        - 8080:8080
+    db:
+        image: postgres
+        restart: always
+        ports:
+        - 5432:5432
+        environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: production
+        volumes:
+        - ./initdb.sh:/docker-entrypoint-initdb.d/initdb.sh
+    redis:
+        image: redis
+        restart: always
+        ports:
+        - 6379:6379
+
+With the following ``initdb.sh`` file::
+
+    #!/bin/bash
+
+    set -e
+
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        CREATE DATABASE testing;
+        CREATE DATABASE development;
+    EOSQL
+
+will set up a redis, postgres, and adminer container for you by running::
+
+    docker-compose up -d
+
+To teardown the docker containers::
+
+    docker-compose down
+
+If you are using VSCode, the following settings are recommended::
+
+    {
+        "editor.formatOnSave": true,
+        "[python]": {
+            "editor.defaultFormatter": "ms-python.python",
+            "editor.insertSpaces": true,
+            "editor.tabSize": 4,
+            "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+            }
+        },
+        "python.sortImports.args": ["--settings-path", "${workspaceFolder}"],
+        "python.formatting.provider": "black",
+        "python.linting.pylintEnabled": true,
+        "python.linting.pylintArgs": ["--rcfile=${workspaceFolder}/pyproject.toml"],
+        "python.sortImports.path": "isort",
+        "python.languageServer": "Pylance",
+        "python.testing.pytestEnabled": true,
+        "python.linting.mypyEnabled": true,
+        "python.linting.mypyArgs": ["--config-file=${workspaceFolder}/mypy.ini"],
+        "files.associations": {
+            "*.toml": "ini"
+        }
+    }
+
+
 Testing
 =======
 

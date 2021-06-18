@@ -127,3 +127,6 @@ id_rsa*
 # Docker Development and Testing setup for Postgres/Redis
 docker-compose.yml
 initdb.sh
+
+# VSCode
+.vscode/
