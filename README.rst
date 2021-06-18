@@ -85,27 +85,27 @@ To teardown the docker containers::
 If you are using VSCode, the following settings are recommended::
 
     {
-        "editor.formatOnSave": true,
-        "[python]": {
-            "editor.defaultFormatter": "ms-python.python",
-            "editor.insertSpaces": true,
-            "editor.tabSize": 4,
-            "editor.codeActionsOnSave": {
-            "source.organizeImports": true
-            }
-        },
-        "python.sortImports.args": ["--settings-path", "${workspaceFolder}"],
-        "python.formatting.provider": "black",
-        "python.linting.pylintEnabled": true,
-        "python.linting.pylintArgs": ["--rcfile=${workspaceFolder}/pyproject.toml"],
-        "python.sortImports.path": "isort",
-        "python.languageServer": "Pylance",
-        "python.testing.pytestEnabled": true,
-        "python.linting.mypyEnabled": true,
-        "python.linting.mypyArgs": ["--config-file=${workspaceFolder}/mypy.ini"],
-        "files.associations": {
-            "*.toml": "ini"
+      "editor.formatOnSave": true,
+      "[python]": {
+        "editor.defaultFormatter": "ms-python.python",
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": true
         }
+      },
+      "python.sortImports.args": ["--settings-path", "${workspaceFolder}"],
+      "python.formatting.provider": "black",
+      "python.linting.pylintEnabled": true,
+      "python.linting.pylintArgs": ["--rcfile=${workspaceFolder}/pyproject.toml"],
+      "python.sortImports.path": "isort",
+      "python.languageServer": "Pylance",
+      "python.testing.pytestEnabled": true,
+      "python.linting.mypyEnabled": true,
+      "python.linting.mypyArgs": ["--config-file=${workspaceFolder}/mypy.ini"],
+      "files.associations": {
+        "*.toml": "ini"
+      }
     }
 
 
