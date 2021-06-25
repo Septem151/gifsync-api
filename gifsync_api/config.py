@@ -40,7 +40,6 @@ class Config:
         elif self.CONFIG_TYPE == "development":
             load_dotenv(".env.development", override=True)
         elif self.CONFIG_TYPE == "testing":
-            print("Loading testing")
             load_dotenv(".env.testing", override=True)
 
         # Flask configuration
@@ -73,8 +72,10 @@ class Config:
         )
 
         # Flask_CORS Configuration
-        self.CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
-        self.CORS_SEND_WILDCARD = bool(os.environ.get("CORS_SEND_WILDCARD", False))
+        self.CORS_ORIGINS = os.environ.get("CORS_ORIGINS")
+        if not self.CORS_ORIGINS:
+            raise ValueError("CORS_ORIGINS must be defined")
+        self.CORS_SUPPORTS_CREDENTIALS = True
 
         # Flask-SQLAlchemy Configuration
         self.SQLALCHEMY_DATABASE_URI = os.environ.get(

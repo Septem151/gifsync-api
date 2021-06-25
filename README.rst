@@ -24,12 +24,12 @@ will be created for you at ``./.venv``):
     # production:
     poetry install --no-dev -E production
 
-If you are developing, change the ``.flaskenv`` file to:
+Create a ``.flaskenv`` file:
 
 .. code-block:: console
 
-    FLASK_APP=gifsync_api:create_app('development')
-    FLASK_ENV=development
+    FLASK_ENV="development"
+    FLASK_APP="gifsync_api:create_app('${FLASK_ENV}')"
 
 You must be running Redis and Postgres. Change the ``REDIS_URL`` and 
 ``SQLALCHEMY_DATABASE_URI`` to point to your Redis and Postgres instances respectively.
@@ -104,7 +104,9 @@ If you are using VSCode, the following settings are recommended::
       "python.linting.mypyEnabled": true,
       "python.linting.mypyArgs": ["--config-file=${workspaceFolder}/mypy.ini"],
       "files.associations": {
-        "*.toml": "ini"
+        "*.toml": "ini",
+        ".flaskenv": "dotenv",
+        ".env.*": "dotenv"
       }
     }
 

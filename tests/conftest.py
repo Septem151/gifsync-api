@@ -22,7 +22,7 @@ def fixture_app() -> t.Generator[Flask, None, None]:
     yield app
 
 
-@pytest.fixture(name="client")
+@pytest.fixture(name="client", scope="function")
 def fixture_client(app: Flask) -> t.Generator[FlaskClient, None, None]:
     """Fixture for a client to interact with GifSync API's Flask app.
 

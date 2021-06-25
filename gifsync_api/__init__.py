@@ -8,6 +8,7 @@ from flask import Flask
 
 from .config import Config
 from .extensions import auth_manager, cors, db, redis_client, rq_queue
+from .routes import blueprints
 
 __version__ = "0.1.0"
 
@@ -25,8 +26,10 @@ def create_app(
         :obj:`flask.Flask`: The Flask instance.
     """
     app = Flask(__name__)
+    app.env = config_type
     app.config.from_object(Config(config_type))
     register_extensions(app)
+    register_blueprints(app)
     return app
 
 
@@ -42,3 +45,13 @@ def register_extensions(app: Flask) -> None:
     redis_client.init_redis(app.config["REDIS_URL"])
     rq_queue.init_queue(redis_client.client)
     db.init_app(app)
+
+
+def register_blueprints(app: Flask) -> None:
+    """Registers blueprint routes onto a GifSync API Flask instance.
+
+    Args:
+        app (:obj:`flask.Flask`): The GifSync API Flask instance.
+    """
+    for blueprint in blueprints:
+        app.register_blueprint(blueprint)

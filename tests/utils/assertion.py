@@ -1,10 +1,9 @@
 """Testing utils for assertions."""
 import typing as t
 from http import HTTPStatus
-from http.cookiejar import Cookie
 
 from flask import Flask, Response
-from flask.testing import FlaskClient
+from werkzeug.http import parse_cookie
 
 
 def assert_user_in_response(response: Response) -> None:
@@ -59,21 +58,20 @@ def assert_token_in_response(response: Response) -> None:
     assert "expires_in" in json_data
 
 
-def assert_refresh_token_in_client_cookies(app: Flask, client: FlaskClient) -> None:
+def assert_refresh_token_in_cookies(app: Flask, response: Response) -> None:
     """Assert that the client has a correctly formatted "refresh_token" cookie set.
 
     Args:
         app (:obj:`~flask.Flask`): The Flask app fixture.
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
-    assert client.cookie_jar is not None
-    cookie: t.Optional[Cookie] = next(
-        (cookie for cookie in client.cookie_jar if cookie.name == "refresh_token"), None
-    )
+    cookies = response.headers.getlist("Set-Cookie")
+    cookie = next((cookie for cookie in cookies if "refresh_token" in cookie), None)
     # Assert that API has set a refresh_token cookie
     assert cookie is not None
-    assert cookie.domain == app.config["DOMAIN"]
-    assert cookie.path == "/auth/refresh"
-    assert cookie.secure is True
-    assert cookie.has_nonstandard_attr("Max-Age")
-    assert cookie.has_nonstandard_attr("HttpOnly")
+    cookie_attrs = parse_cookie(cookie)
+    assert "Domain" in cookie_attrs and cookie_attrs["Domain"] == app.config["DOMAIN"]
+    assert "Path" in cookie_attrs and cookie_attrs["Path"] == "/auth/refresh"
+    assert "Secure" in cookie_attrs
+    assert "Max-Age" in cookie_attrs
+    assert "HttpOnly" in cookie_attrs

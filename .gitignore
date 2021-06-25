@@ -122,6 +122,7 @@ id_rsa*
 
 # Environment Variables
 .env*
+.flaskenv
 !.env.sample
 
 # Docker Development and Testing setup for Postgres/Redis

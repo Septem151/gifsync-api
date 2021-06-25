@@ -8,7 +8,7 @@ from gifsync_api.extensions import auth_manager
 
 from .utils.assertion import (
     assert_error_response,
-    assert_refresh_token_in_client_cookies,
+    assert_refresh_token_in_cookies,
     assert_token_in_response,
 )
 from .utils.generation import create_expired_refresh_token, create_random_username
@@ -29,7 +29,7 @@ def test_gives_anon_user_auth_token_and_sets_refresh_token_cookie(
     # Assert that API accepts the request
     assert response.status_code == HTTPStatus.OK
     assert_token_in_response(response)
-    assert_refresh_token_in_client_cookies(app, client)
+    assert_refresh_token_in_cookies(app, response)
 
 
 def test_refreshes_token_with_valid_refresh_token_cookie(
