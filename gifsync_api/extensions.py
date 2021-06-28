@@ -5,6 +5,7 @@ Database interaction, and Task scheduling.
 import typing as t
 
 from flask_cors import CORS
+from flask_migrate import Migrate
 from flask_pyjwt import AuthManager
 from flask_sqlalchemy import SQLAlchemy
 from redis import Redis
@@ -185,3 +186,4 @@ cors = CORS()
 db = SQLAlchemy()
 redis_client = RedisClient()
 rq_queue = RQ()
+migrate = Migrate()

@@ -4,10 +4,11 @@ import typing as t
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
-from flask_sqlalchemy import SQLAlchemy
 from gifsync_api import create_app
 from gifsync_api.extensions import db
-from gifsync_api.models import Gif, GifSyncUser  # pylint: disable=unused-import
+
+# pylint: disable=wrong-import-order
+from gifsync_api.models import Gif, GifSyncUser, Role
 
 
 @pytest.fixture(name="app", scope="session")
@@ -19,7 +20,12 @@ def fixture_app() -> t.Generator[Flask, None, None]:
     """
     app = create_app("testing")
     app.config["TESTING"] = True
+    with app.app_context():
+        db.create_all()
     yield app
+
+    with app.app_context():
+        db.drop_all()
 
 
 @pytest.fixture(name="client", scope="function")
@@ -36,25 +42,8 @@ def fixture_client(app: Flask) -> t.Generator[FlaskClient, None, None]:
         yield client
 
 
-@pytest.fixture(name="database", scope="session")
-def fixture_db(app: Flask) -> t.Generator[SQLAlchemy, None, None]:
-    """Fixture for the GifSync API database.
-
-    Args:
-        app (:obj:`~flask.Flask`): The Flask app fixture.
-
-    Yields:
-        :obj:`Generator[SQLAlchemy, None, None]`: SQLAlchemy database.
-    """
-    with app.app_context():
-        db.create_all()
-        yield db
-
-        db.drop_all()
-
-
 @pytest.fixture(name="db_session", scope="function")
-def fixture_db_session(database: SQLAlchemy):
+def fixture_db_session(app: Flask):
     """Fixture for the GifSync API database session.
 
     Args:
@@ -63,13 +52,13 @@ def fixture_db_session(database: SQLAlchemy):
     Yields:
         SQLAlchemy scoped_session.
     """
-    connection = database.engine.connect()
-    transaction = connection.begin()
-    options = dict(bind=connection, binds={})
-    db_session = database.create_scoped_session(options=options)
-    database.session = db_session
-    yield db_session
+    with app.app_context():
+        db_session = db.session
+        db_session.add_all([Role(name="admin"), Role(name="spotify")])
+        db_session.commit()
+        yield db_session
 
-    transaction.rollback()
-    connection.close()
-    db_session.remove()
+        GifSyncUser.query.delete()
+        Gif.query.delete()
+        db_session.commit()
+        db_session.remove()

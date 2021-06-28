@@ -103,16 +103,19 @@ def post_users(
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
+    user_json = (
+        {"username": username, "scope": {"spotify": False, "admin": False}}
+        if username
+        else None
+    )
     if auth_token:
         response: Response = client.post(
             "/users",
-            json={"username": username} if username else None,
+            json=user_json,
             headers={"Authorization": f"Bearer {auth_token}"},
         )
     else:
-        response = client.post(
-            "/users", json={"username": username} if username else None
-        )
+        response = client.post("/users", json=user_json)
     return response
 
 
@@ -173,11 +176,13 @@ def post_user(
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    # TODO: Need to rework this request function.
+    user_json = {"username": username, "scope": {"spotify": False, "admin": False}}
     if auth_token:
         response: Response = client.post(
-            f"/users/{username}", headers={"Authorization": f"Bearer {auth_token}"}
+            f"/users/{username}",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            json=user_json,
         )
     else:
-        response = client.post(f"/users/{username}")
+        response = client.post(f"/users/{username}", json=user_json)
     return response

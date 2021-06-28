@@ -1,5 +1,6 @@
 """Resource route definitions for /auth and its sub-resources."""
 import secrets
+import typing as t
 
 import requests
 
@@ -7,6 +8,7 @@ from flask import Blueprint, current_app, make_response, request
 from flask_pyjwt import current_token, require_token
 
 from ..extensions import auth_manager
+from ..models import GifSyncUser
 from ..representations import AuthToken
 
 auth_blueprint = Blueprint("auth", __name__, url_prefix="/auth")
@@ -34,6 +36,10 @@ def token_route():
         if resp.status_code == 200:
             sub = resp.json()["id"]
             scope["spotify"] = True
+    user: t.Optional[GifSyncUser] = GifSyncUser.query.filter_by(username=sub).first()
+    if user:
+        scope["admin"] = user.has_role("admin")
+        scope["spotify"] = user.has_role("spotify")
     auth_token = auth_manager.auth_token(sub, scope)
     refresh_token = auth_manager.refresh_token(sub)
     response = make_response(AuthToken(auth_token).to_json())
@@ -56,6 +62,12 @@ def refresh_route():
 
     Refreshes an auth token if provided a valid refresh token.
     """
-    auth_token = auth_manager.auth_token(current_token.sub)
-    # TODO: Query for user's scope
+    scope = {"admin": False, "spotify": False}
+    user: t.Optional[GifSyncUser] = GifSyncUser.query.filter_by(
+        username=current_token.sub
+    ).first()
+    if user:
+        scope["admin"] = user.has_role("admin")
+        scope["spotify"] = user.has_role("spotify")
+    auth_token = auth_manager.auth_token(current_token.sub, scope)
     return AuthToken(auth_token).to_json(), 200

@@ -28,6 +28,7 @@ rq = "^1.8.1"
 psycopg2 = { version = "^2.9", optional = true }
 psycopg2-binary = { version = "^2.9", optional = true }
 Flask-SQLAlchemy = "^2.5.1"
+Flask-Migrate = "^3.0.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -51,6 +52,7 @@ profile = "black"
 
 [tool.pylint.master]
 load-plugins = "pylint_flask_sqlalchemy"
+ignored-classes = "scoped_session"
 
 [tool.pylint.design]
 max-args = 6
