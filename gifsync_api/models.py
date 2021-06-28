@@ -26,7 +26,7 @@ def pg_utcnow(element, compiler, **kwargs):  # pylint: disable=unused-argument
     return "TIMEZONE('utc', CURRENT_TIMESTAMP)"
 
 
-class User(db.Model):  # pylint: disable=too-few-public-methods
+class GifSyncUser(db.Model):  # pylint: disable=too-few-public-methods
     """Model representing a User object in the database.
 
     User has 3 columns: id, username, and created_at.
@@ -46,6 +46,22 @@ class User(db.Model):  # pylint: disable=too-few-public-methods
     gifs = db.relationship(
         "Gif", backref="owner", cascade="all, delete-orphan", passive_deletes=True
     )
+
+    @property
+    def to_json(self) -> dict:
+        """JSON representation of the GifSyncUser.
+
+        Returns:
+            :obj:`dict`: JSON representation.
+        """
+        return {
+            "username": self.username,
+            "spotify_user": self.spotify_user,
+            "admin_user": self.admin_user,
+            "gifs": [
+                gif.to_json() for gif in self.gifs  # pylint: disable=not-an-iterable
+            ],
+        }
 
 
 class Gif(db.Model):  # pylint: disable=too-few-public-methods
@@ -82,3 +98,20 @@ class Gif(db.Model):  # pylint: disable=too-few-public-methods
     beats_per_loop = db.Column(db.Float, nullable=False)
     custom_tempo = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, server_default=UtcNow(), nullable=False)
+
+    @property
+    def to_json(self) -> dict:
+        """JSON representation of the Gif.
+
+        Returns:
+            :obj:`dict`: JSON representation.
+        """
+        return {
+            "id": self.id,
+            "owner": self.owner.username,
+            "name": self.name,
+            "image": self.image,
+            "thumbnail": self.thumbnail,
+            "beats_per_loop": self.beats_per_loop,
+            "custom_tempo": self.custom_tempo,
+        }

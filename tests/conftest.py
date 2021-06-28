@@ -7,7 +7,7 @@ from flask.testing import FlaskClient
 from flask_sqlalchemy import SQLAlchemy
 from gifsync_api import create_app
 from gifsync_api.extensions import db
-from gifsync_api.models import Gif, User  # pylint: disable=unused-import
+from gifsync_api.models import Gif, GifSyncUser  # pylint: disable=unused-import
 
 
 @pytest.fixture(name="app", scope="session")
