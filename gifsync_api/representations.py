@@ -37,8 +37,6 @@ class AuthToken:
             :obj:`dict`: "scope" claim of auth token.
         """
         scope = self._auth_token.scope
-        print(scope)
-        print(type(scope))
         if not isinstance(scope, dict):
             raise ValueError("Token's scope claim must be of type 'dict'")
         if "admin" not in scope or "spotify" not in scope:

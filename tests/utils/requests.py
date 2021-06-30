@@ -163,7 +163,9 @@ def get_user(
 
 
 def post_user(
-    client: FlaskClient, username: str, auth_token: t.Optional[str] = None
+    client: FlaskClient,
+    username: t.Optional[str] = None,
+    auth_token: t.Optional[str] = None,
 ) -> Response:
     """POST /users/<username>
 
@@ -176,7 +178,11 @@ def post_user(
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    user_json = {"username": username, "scope": {"spotify": False, "admin": False}}
+    user_json = (
+        {"username": username, "scope": {"spotify": False, "admin": False}}
+        if username
+        else None
+    )
     if auth_token:
         response: Response = client.post(
             f"/users/{username}",

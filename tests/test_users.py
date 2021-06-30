@@ -91,9 +91,9 @@ def test_allows_admin_to_post_any_users(client: FlaskClient) -> None:
 
 
 def test_rejects_post_to_users_with_mismatching_auth_token(client: FlaskClient) -> None:
-    """Assert that the GifSync API will respond with 403 Forbidden and an error message
-    when POST /users is requested by a user whose auth token doesn't contain a "sub"
-    equal to that of the username of the user they are trying to POST.
+    """Assert that the GifSync API will respond with 403 Forbidden and an error
+    message when POST /users is requested by a user whose auth token doesn't contain
+    a "sub" equal to that of the username of the user they are trying to POST.
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
@@ -172,7 +172,7 @@ def test_allows_admin_to_delete_all_users(client: FlaskClient, db_session) -> No
     auth_token = create_auth_token(auth_manager, username, admin=True)
     response = delete_users(client, auth_token.signed)
     assert response.status_code == HTTPStatus.NO_CONTENT
-    assert response.content_length == 0
+    assert response.content_length is None
 
 
 def test_rejects_user_from_deleting_all_users(client: FlaskClient) -> None:
@@ -240,9 +240,10 @@ def test_allows_admin_to_get_any_user_by_id(client: FlaskClient, db_session) -> 
 def test_rejects_getting_user_by_id_with_mismatching_auth_token(
     client: FlaskClient,
 ) -> None:
-    """Assert that the GifSync API will respond with 403 Forbidden and an error message
-    when GET /users/<username> is requested by a user whose auth token doesn't contain
-    a "sub" equal to that of the username of the user they are trying to GET.
+    """Assert that the GifSync API will respond with 403 Forbidden and an error
+    message when GET /users/<username> is requested by a user whose auth token
+    doesn't contain a "sub" equal to that of the username of the user they are
+    trying to GET.
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
@@ -330,3 +331,37 @@ def test_allows_post_to_user_by_id_with_matching_auth_token(
     auth_token = create_auth_token(auth_manager, username)
     response = post_user(client, username, auth_token.signed)
     assert response.status_code == HTTPStatus.OK
+    assert_user_in_response(response)
+
+
+def test_allows_admin_to_post_any_user_by_id(client: FlaskClient, db_session) -> None:
+    """Assert that the GifSync API will respond with 200 OK and a user object when
+    POST /users/<username> is requested by an admin for any username.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    populate_database_with_users(db_session, username)
+    admin_username = create_random_username()
+    auth_token = create_auth_token(auth_manager, admin_username, admin=True)
+    response = post_user(client, username, auth_token.signed)
+    assert response.status_code == HTTPStatus.OK
+    assert_user_in_response(response)
+
+
+def test_rejects_post_to_user_by_id_with_mismatching_auth_token(
+    client: FlaskClient,
+) -> None:
+    """Assert that the GifSync API will respond with 403 Forbidden and an error
+    message when POST /users/<username> is requested for a username that doesn't
+    match the auth token's sub.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    username = create_random_username()
+    auth_token = create_auth_token(auth_manager, username)
+    response = post_user(client, auth_token=auth_token.signed)
+    assert_error_response(response, HTTPStatus.FORBIDDEN)

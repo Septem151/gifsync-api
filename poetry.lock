@@ -211,7 +211,7 @@ Flask-SQLAlchemy = ">=1.0"
 
 [[package]]
 name = "flask-pyjwt"
-version = "0.1.8"
+version = "0.1.9"
 description = "Flask extension for creating, verifying, and requiring the presence of JWTs"
 category = "main"
 optional = false
@@ -953,8 +953,8 @@ flask-migrate = [
     {file = "Flask_Migrate-3.0.1-py2.py3-none-any.whl", hash = "sha256:df9043d2050df3c0e0f6313f6b529b62c837b6033c20335e9d0b4acdf2c40e23"},
 ]
 flask-pyjwt = [
-    {file = "flask_pyjwt-0.1.8-py3-none-any.whl", hash = "sha256:85b8c0f4aee96002bad80997ff32be15dd00f4d8c7042dd152ce3bae571e49d5"},
-    {file = "flask_pyjwt-0.1.8.tar.gz", hash = "sha256:807d5e2c7a90671cacf8080fabf4f91a79746bdad31783bea1b6497d684ae398"},
+    {file = "flask_pyjwt-0.1.9-py3-none-any.whl", hash = "sha256:572eef3b403b19564406b5f1bfb075ac0a6f9a3de19dd1d2841425a5fd14efa5"},
+    {file = "flask_pyjwt-0.1.9.tar.gz", hash = "sha256:5d9eaf2588c8a8479a25a9f553e0a40b295c09c993bee53e6ae48a6cbd37f034"},
 ]
 flask-sqlalchemy = [
     {file = "Flask-SQLAlchemy-2.5.1.tar.gz", hash = "sha256:2bda44b43e7cacb15d4e05ff3cc1f8bc97936cc464623424102bfc2c35e95912"},

@@ -49,15 +49,96 @@ def post_users_route():
     spotify_role = Role.query.filter_by(name="spotify").first()
     admin_role = Role.query.filter_by(name="admin").first()
     if is_admin_token and scope:
-        if "spotify" in scope and scope["spotify"] and not user.has_role("spotify"):
+        if (
+            "spotify" in scope
+            and bool(scope["spotify"])
+            and not user.has_role("spotify")
+        ):
             user.roles.append(spotify_role)
-        if "admin" in scope and scope["admin"] and not user.has_role("admin"):
+        if "admin" in scope and bool(scope["admin"]) and not user.has_role("admin"):
             user.roles.append(admin_role)
     else:
-        if current_token.scope.get("spotify") and not user.has_role("spotify"):
+        if (
+            "spotify" in scope
+            and bool(scope["spotify"])
+            and not user.has_role("spotify")
+        ):
             user.roles.append(spotify_role)
-        if current_token.scope.get("admin") and not user.has_role("admin"):
-            user.roles.append(admin_role)
+        elif (
+            "spotify" in scope
+            and not bool(scope["spotify"])
+            and user.has_role("spotify")
+        ):
+            user.roles.remove(spotify_role)
     db.session.add(user)
     db.session.commit()
     return {"user": user.to_json()}, return_code
+
+
+@users_blueprint.route("", methods=["DELETE"])
+@require_token(scope={"admin": True})
+def delete_users_route():
+    """DELETE /users
+
+    Deletes all users. Only accessible by admin.
+    """
+    GifSyncUser.query.delete()
+    db.session.commit()
+    return "", 204
+
+
+@users_blueprint.route("/<string:username>", methods=["GET"])
+@require_token(sub="username", override={"scope": {"admin": True}})
+def get_user_route(username: str):
+    """GET /users/<username>
+
+    Retrieve a user with the specified username.
+
+    Args:
+        username (:obj:`str`): Username of user to look up.
+    """
+    user: t.Optional[GifSyncUser] = GifSyncUser.query.filter_by(
+        username=username
+    ).first()
+    if not user:
+        return {"error": "User not found"}, HTTPStatus.NOT_FOUND
+    return {"user": user.to_json()}, HTTPStatus.OK
+
+
+@users_blueprint.route("/<string:username>", methods=["POST"])
+@require_token(sub="username", override={"scope": {"admin": True}})
+def post_user_route(username: str):
+    """POST /users/<username>
+
+    Modify a user with the specified username.
+
+    Args:
+        username (:obj:`str`): Username of user modify.
+    """
+    user: t.Optional[GifSyncUser] = GifSyncUser.query.filter_by(
+        username=username
+    ).first()
+    if not user:
+        return {"error": "User not found"}, HTTPStatus.NOT_FOUND
+    new_user_info = request.get_json()
+    token_scope = current_token.scope
+    if new_user_info:
+        new_username = new_user_info.get("username")
+        new_scope = new_user_info.get("scope")
+        if new_username:
+            user.username = new_username
+        if new_scope and new_scope.get("spotify"):
+            spotify_role = Role.query.filter_by(name="spotify").first()
+            if bool(new_scope["spotify"]) and not user.has_role("spotify"):
+                user.roles.append(spotify_role)
+            elif not bool(new_scope["spotify"]) and user.has_role("spotify"):
+                user.roles.remove(spotify_role)
+        if (
+            new_scope
+            and new_scope.get("admin")
+            and bool(token_scope.scope.get("admin"))  # type: ignore
+            and not user.has_role("admin")
+        ):
+            user.roles.append(Role.query.filter_by(name="admin").first())
+    db.session.commit()
+    return {"user": user.to_json()}, HTTPStatus.OK
