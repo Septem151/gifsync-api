@@ -67,6 +67,26 @@ def post_refresh(client: FlaskClient) -> Response:
     return response
 
 
+def post_logout(client: FlaskClient, auth_token: t.Optional[str] = None) -> Response:
+    """POST /auth/logout
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    if auth_token:
+        response: Response = client.post(
+            "/auth/logout", headers={"Authorization": f"Bearer {auth_token}"}
+        )
+    else:
+        response = client.post("/auth/logout")
+    return response
+
+
 def get_users(client: FlaskClient, auth_token: t.Optional[str] = None) -> Response:
     """GET /users
 
@@ -84,38 +104,6 @@ def get_users(client: FlaskClient, auth_token: t.Optional[str] = None) -> Respon
         )
     else:
         response = client.get("/users")
-    return response
-
-
-def post_users(
-    client: FlaskClient,
-    auth_token: t.Optional[str] = None,
-    username: t.Optional[str] = None,
-) -> Response:
-    """POST /users
-
-    Args:
-        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
-        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
-            Defaults to None.
-        username (:obj:`str`, optional): Username of User to post. Defaults to None.
-
-    Returns:
-        :obj:`~flask.Response`: The Flask Response object.
-    """
-    user_json = (
-        {"username": username, "scope": {"spotify": False, "admin": False}}
-        if username
-        else None
-    )
-    if auth_token:
-        response: Response = client.post(
-            "/users",
-            json=user_json,
-            headers={"Authorization": f"Bearer {auth_token}"},
-        )
-    else:
-        response = client.post("/users", json=user_json)
     return response
 
 
@@ -162,12 +150,12 @@ def get_user(
     return response
 
 
-def post_user(
+def delete_user(
     client: FlaskClient,
     username: t.Optional[str] = None,
     auth_token: t.Optional[str] = None,
 ) -> Response:
-    """POST /users/<username>
+    """DELETE /users/<username>
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
@@ -178,17 +166,10 @@ def post_user(
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    user_json = (
-        {"username": username, "scope": {"spotify": False, "admin": False}}
-        if username
-        else None
-    )
     if auth_token:
-        response: Response = client.post(
-            f"/users/{username}",
-            headers={"Authorization": f"Bearer {auth_token}"},
-            json=user_json,
+        response: Response = client.delete(
+            f"/users/{username}", headers={"Authorization": f"Bearer {auth_token}"}
         )
     else:
-        response = client.post(f"/users/{username}", json=user_json)
+        response = client.delete(f"/users/{username}")
     return response

@@ -121,6 +121,17 @@ class SpotifyAuthToken:
         """
         return self._expires_in
 
+    def to_json(self) -> dict:
+        """The json representation of a Spotify auth token.
+
+        Returns:
+            :obj:`dict`: Spotify auth token represented in JSON format.
+        """
+        return {
+            "spotify_token": self.token,
+            "expires_in": self.expires_in,
+        }
+
 
 class Task:
     """Representation of a Task for returning from the GifSync API.

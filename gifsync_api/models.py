@@ -1,4 +1,6 @@
 """Model representations for objects stored in the GifSync API's database."""
+import typing as t
+
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql import expression
 from sqlalchemy.types import DateTime
@@ -55,6 +57,24 @@ class Role(db.Model):  # pylint: disable=too-few-public-methods
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, nullable=False)
     name = db.Column(db.String(80), nullable=False)
 
+    @classmethod
+    def get_by_name(cls, name: str) -> "Role":
+        """Gets a role by name.
+
+        Args:
+            name (:obj:`str`): Name of role to get.
+
+        Raises:
+            :obj:`ValueError`: If a role with the given name does not exist.
+
+        Returns:
+            :obj:`~gifsync_api.models.Role`: The role.
+        """
+        role: t.Optional["Role"] = cls.query.filter_by(name=name).first()
+        if not role:
+            raise ValueError(f"Role with the name {name} does not exist")
+        return role
+
 
 class GifSyncUser(db.Model):  # pylint: disable=too-few-public-methods
     """Model representing a User object in the database.
@@ -92,10 +112,25 @@ class GifSyncUser(db.Model):  # pylint: disable=too-few-public-methods
         Returns:
             :obj:`bool`: True if user has assigned role, otherwise False.
         """
-        for role in self.roles:  # pylint: disable=not-an-iterable
+        roles: t.List[Role] = self.roles
+        for role in roles:  # pylint: disable=not-an-iterable
             if role.name == role_name:
                 return True
         return False
+
+    def set_role(self, role_name: str, value: bool) -> None:
+        """Gives or removes a user's role based on the value provided.
+
+        Args:
+            role_name (:obj:`str`): The role's name.
+            value (:obj:`bool`): Whether to give or remove the role.
+        """
+        roles: t.List[Role] = self.roles
+        role: Role = Role.get_by_name(role_name)
+        if self.has_role(role_name) and not value:
+            roles.remove(role)
+        elif not self.has_role(role_name) and value:
+            roles.append(role)
 
     def to_json(self) -> dict:
         """JSON representation of the GifSyncUser.
@@ -111,6 +146,49 @@ class GifSyncUser(db.Model):  # pylint: disable=too-few-public-methods
                 gif.to_json() for gif in self.gifs  # pylint: disable=not-an-iterable
             ],
         }
+
+    @classmethod
+    def get_by_username(cls, username: str) -> t.Optional["GifSyncUser"]:
+        """Gets a user by their username if they exist, otherwise None.
+
+        Args:
+            username (:obj:`str`): Username of user to get.
+
+        Returns:
+            :obj:`~gifsync_api.models.GifSyncUser` | ``None``: The user if they
+                exist, otherwise None.
+        """
+        user: t.Optional["GifSyncUser"] = cls.query.filter_by(username=username).first()
+        return user
+
+    @classmethod
+    def get_by_id(cls, user_id: int) -> t.Optional["GifSyncUser"]:
+        """Gets a user by their id if they exist, otherwise None.
+
+        Args:
+            id (:obj:`int`): Id of user to get.
+
+        Returns:
+            :obj:`~gifsync_api.models.GifSyncUser` | ``None``: The user if they
+                exist, otherwise None.
+        """
+        user: t.Optional["GifSyncUser"] = cls.query.filter_by(id=user_id).first()
+        return user
+
+    @classmethod
+    def get_all(cls) -> t.List["GifSyncUser"]:
+        """Gets a list of all users.
+
+        Returns:
+            list of :obj:`~gifsync_api.models.GifSyncUser`: All users.
+        """
+        users: t.List["GifSyncUser"] = cls.query.all()
+        return users
+
+    @classmethod
+    def delete_all(cls) -> None:
+        """Deletes all users."""
+        cls.query.delete()
 
 
 class Gif(db.Model):  # pylint: disable=too-few-public-methods

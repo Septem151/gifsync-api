@@ -7,12 +7,22 @@ from gifsync_api import __version__
 from gifsync_api.extensions import auth_manager
 
 from .utils.assertion import (
+    assert_deleted_cookies_in_response,
     assert_error_response,
     assert_refresh_token_in_cookies,
     assert_token_in_response,
 )
-from .utils.generation import create_expired_refresh_token, create_random_username
-from .utils.requests import add_refresh_token_cookie_to_client, post_refresh, post_token
+from .utils.generation import (
+    create_auth_token,
+    create_expired_refresh_token,
+    create_random_username,
+)
+from .utils.requests import (
+    add_refresh_token_cookie_to_client,
+    post_logout,
+    post_refresh,
+    post_token,
+)
 
 
 def test_gives_anon_user_auth_token_and_sets_refresh_token_cookie(
@@ -101,3 +111,27 @@ def test_rejects_refresh_with_missing_refresh_token_cookie(
     """
     response = post_refresh(client)
     assert_error_response(response, HTTPStatus.UNAUTHORIZED)
+
+
+def test_allows_logout_with_auth_token(app: Flask, client: FlaskClient) -> None:
+    """Assert that the GifSync API will respond with 204 No Content and delete the
+    "refresh_token", "spotify_refresh_token", and "auto_token" cookies when
+    POST /auth/logout is requested.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    username = create_random_username()
+    auth_token = create_auth_token(auth_manager, username)
+    response = post_logout(client, auth_token.signed)
+    assert response.status_code == HTTPStatus.NO_CONTENT
+    assert response.content_length is None
+    assert_deleted_cookies_in_response(
+        app,
+        response,
+        [
+            ("refresh_token", "/auth/refresh"),
+            ("spotify_refresh_token", "/auth/spotify/refresh"),
+            ("auto_token", "/auth/token"),
+        ],
+    )
