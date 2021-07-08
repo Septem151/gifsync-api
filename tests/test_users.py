@@ -4,7 +4,6 @@ import typing as t
 from http import HTTPStatus
 
 from flask.testing import FlaskClient
-from gifsync_api.extensions import auth_manager
 from gifsync_api.models import GifSyncUser
 
 from .utils.assertion import assert_error_response, assert_user_in_response
@@ -26,7 +25,7 @@ def test_allows_admin_to_get_all_users(client: FlaskClient, db_session) -> None:
         db_session: The Database session fixture.
     """
     populate_database_with_users(db_session)
-    auth_token = create_auth_token(auth_manager, create_random_username(), admin=True)
+    auth_token = create_auth_token(create_random_username(), admin=True)
     response = get_users(client, auth_token.signed)
     assert response.status_code == HTTPStatus.OK
     json_data: t.Optional[dict] = response.get_json()
@@ -43,7 +42,7 @@ def test_rejects_user_from_getting_all_users(client: FlaskClient) -> None:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
     username = create_random_username()
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     response = get_users(client, auth_token.signed)
     assert_error_response(response, HTTPStatus.FORBIDDEN)
 
@@ -71,11 +70,11 @@ def test_allows_admin_to_delete_all_users(client: FlaskClient, db_session) -> No
     """
     username = create_random_username()
     populate_database_with_users(db_session)
-    auth_token = create_auth_token(auth_manager, username, admin=True)
+    auth_token = create_auth_token(username, admin=True)
     response = delete_users(client, auth_token.signed)
     assert response.status_code == HTTPStatus.NO_CONTENT
     assert response.content_length is None
-    all_users = GifSyncUser.query.all()
+    all_users = GifSyncUser.get_all()
     assert len(all_users) == 0
 
 
@@ -87,7 +86,7 @@ def test_rejects_user_from_deleting_all_users(client: FlaskClient) -> None:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
     username = create_random_username()
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     response = delete_users(client, auth_token.signed)
     assert_error_response(response, HTTPStatus.FORBIDDEN)
 
@@ -118,9 +117,9 @@ def test_allows_getting_user_by_id_with_matching_auth_token(
     """
     username = create_random_username()
     populate_database_with_users(db_session, username)
-    user = GifSyncUser.query.filter_by(username=username).first()
+    user = GifSyncUser.get_by_username(username)
     assert user is not None
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     response = get_user(client, username, auth_token.signed)
     assert response.status_code == HTTPStatus.OK
     assert_user_in_response(response)
@@ -137,9 +136,9 @@ def test_allows_admin_to_get_any_user_by_id(client: FlaskClient, db_session) -> 
     username = create_random_username()
     admin_username = create_random_username()
     populate_database_with_users(db_session, username)
-    user = GifSyncUser.query.filter_by(username=username).first()
+    user = GifSyncUser.get_by_username(username)
     assert user is not None
-    auth_token = create_auth_token(auth_manager, admin_username, admin=True)
+    auth_token = create_auth_token(admin_username, admin=True)
     response = get_user(client, username, auth_token.signed)
     assert response.status_code == HTTPStatus.OK
     assert_user_in_response(response)
@@ -158,7 +157,7 @@ def test_rejects_getting_user_by_id_with_mismatching_auth_token(
     """
     username = create_random_username()
     get_username = create_random_username()
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     response = get_user(client, get_username, auth_token.signed)
     assert_error_response(response, HTTPStatus.FORBIDDEN)
 
@@ -173,7 +172,7 @@ def test_rejects_getting_user_by_id_with_invalid_auth_token(
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
     username = create_random_username()
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     assert auth_token.signed is not None
     invalid_token = auth_token.signed[:-2]
     response = get_user(client, username, invalid_token)
@@ -190,7 +189,7 @@ def test_rejects_getting_user_by_id_with_expired_auth_token(
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
     username = create_random_username()
-    auth_token = create_expired_auth_token(auth_manager, username)
+    auth_token = create_expired_auth_token(username)
     response = get_user(client, username, auth_token.signed)
     assert_error_response(response, HTTPStatus.UNAUTHORIZED)
 
@@ -219,9 +218,9 @@ def test_responds_404_when_getting_user_by_nonexistent_id(
     """
     populate_database_with_users(db_session)
     username = create_random_username()
-    user = GifSyncUser.query.filter_by(username=username).first()
+    user = GifSyncUser.get_by_username(username)
     assert user is None
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     response = get_user(client, username, auth_token.signed)
     assert_error_response(response, HTTPStatus.NOT_FOUND)
 
@@ -239,12 +238,12 @@ def test_allows_delete_user_by_id_with_matching_auth_token(
     """
     username = create_random_username()
     populate_database_with_users(db_session, username)
-    assert GifSyncUser.query.filter_by(username=username).first() is not None
-    auth_token = create_auth_token(auth_manager, username)
+    assert GifSyncUser.get_by_username(username) is not None
+    auth_token = create_auth_token(username)
     response = delete_user(client, username, auth_token.signed)
     assert response.status_code == HTTPStatus.NO_CONTENT
     assert response.content_length is None
-    assert GifSyncUser.query.filter_by(username=username).first() is None
+    assert GifSyncUser.get_by_username(username) is None
 
 
 def test_allows_admin_to_delete_any_user_by_id(client: FlaskClient, db_session) -> None:
@@ -258,12 +257,12 @@ def test_allows_admin_to_delete_any_user_by_id(client: FlaskClient, db_session) 
     username = create_random_username()
     admin_username = create_random_username()
     populate_database_with_users(db_session, username)
-    assert GifSyncUser.query.filter_by(username=username).first() is not None
-    auth_token = create_auth_token(auth_manager, admin_username, admin=True)
+    assert GifSyncUser.get_by_username(username) is not None
+    auth_token = create_auth_token(admin_username, admin=True)
     response = delete_user(client, username, auth_token.signed)
     assert response.status_code == HTTPStatus.NO_CONTENT
     assert response.content_length is None
-    assert GifSyncUser.query.filter_by(username=username).first() is None
+    assert GifSyncUser.get_by_username(username) is None
 
 
 def test_rejects_delete_user_by_id_with_mismatching_auth_token(
@@ -278,7 +277,7 @@ def test_rejects_delete_user_by_id_with_mismatching_auth_token(
     """
     username = create_random_username()
     delete_username = create_random_username()
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     response = delete_user(client, delete_username, auth_token.signed)
     assert_error_response(response, HTTPStatus.FORBIDDEN)
 
@@ -292,7 +291,7 @@ def test_rejects_delete_user_by_id_with_invalid_auth_token(client: FlaskClient) 
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
     username = create_random_username()
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     assert auth_token.signed is not None
     invalid_token = auth_token.signed[:-2]
     response = delete_user(client, username, invalid_token)
@@ -308,7 +307,7 @@ def test_rejects_delete_user_by_id_with_expired_auth_token(client: FlaskClient) 
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
     username = create_random_username()
-    auth_token = create_expired_auth_token(auth_manager, username)
+    auth_token = create_expired_auth_token(username)
     response = delete_user(client, username, auth_token.signed)
     assert_error_response(response, HTTPStatus.UNAUTHORIZED)
 
@@ -333,7 +332,7 @@ def test_responds_404_when_delete_user_by_nonexistent_id(client: FlaskClient) ->
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
     """
     username = create_random_username()
-    auth_token = create_auth_token(auth_manager, username)
+    auth_token = create_auth_token(username)
     response = delete_user(client, username, auth_token.signed)
     assert_error_response(response, HTTPStatus.NOT_FOUND)
-    assert GifSyncUser.query.filter_by(username=username).first() is None
+    assert GifSyncUser.get_by_username(username) is None

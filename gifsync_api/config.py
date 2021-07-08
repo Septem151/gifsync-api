@@ -2,9 +2,7 @@
 Configuration of the GifSync API, based on .env.* files, which are then injected
 into the app's config.
 """
-# pylint: disable=invalid-name
-# pylint: disable=too-few-public-methods
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=invalid-name,too-few-public-methods,too-many-branches,too-many-instance-attributes
 import os
 import secrets
 import typing as t
@@ -97,3 +95,14 @@ class Config:
         self.REDIRECT_URI = os.environ.get("REDIRECT_URI")
         if not self.REDIRECT_URI:
             raise ValueError("REDIRECT_URI must be defined")
+
+        # AWS
+        self.AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY")
+        if not self.AWS_ACCESS_KEY:
+            raise ValueError("AWS_ACCESS_KEY must be defined")
+        self.AWS_SECRET_KEY = os.environ.get("AWS_SECRET_KEY")
+        if not self.AWS_SECRET_KEY:
+            raise ValueError("AWS_SECRET_KEY must be defined")
+        self.AWS_S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
+        if not self.AWS_S3_BUCKET:
+            raise ValueError("AWS_S3_BUCKET must be defined")

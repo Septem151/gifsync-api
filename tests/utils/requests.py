@@ -1,13 +1,93 @@
 """Testing utils for making requests to the GifSync API."""
+import pathlib
 import typing as t
 
 from flask import Flask, Response
 from flask.testing import FlaskClient
-from flask_pyjwt import AuthManager
+from gifsync_api.extensions import auth_manager
+
+
+def _get_request(
+    client: FlaskClient, route: str, auth_token: t.Optional[str] = None
+) -> Response:
+    """GET <route>
+
+    Generic GET request with optional parameters for Authorization header.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        route (:obj:`str`): The route to GET.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else None
+    response: Response = client.get(route, headers=headers)
+    return response
+
+
+def _post_request(
+    client: FlaskClient,
+    route: str,
+    auth_token: t.Optional[str] = None,
+    data: t.Optional[dict] = None,
+    is_json: bool = True,
+) -> Response:
+    """POST <route>
+
+    Generic POST request with optional parameters for Authorization header
+    and JSON data.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        route (:obj:`str`): The route to POST.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+        json_data (:obj:`dict`, optional): JSON data to POST. Defaults to None.
+        form_data (:obj:`dict`, optional): Form data to POST. Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    kwargs = {}
+    if auth_token:
+        kwargs["headers"] = {"Authorization": f"Bearer {auth_token}"}
+    if data:
+        if is_json:
+            kwargs["json"] = data
+            kwargs["headers"]["Content-Type"] = "application/json"
+        else:
+            kwargs["data"] = data
+            kwargs["headers"]["Content-Type"] = "application/x-www-form-urlencoded"
+    response: Response = client.post(route, **kwargs)  # type: ignore
+    return response
+
+
+def _delete_request(
+    client: FlaskClient, route: str, auth_token: t.Optional[str] = None
+) -> Response:
+    """DELETE <route>
+
+    Generic DELETE request with optional parameters for Authorization header.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        route (:obj:`str`): The route to GET.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else None
+    response: Response = client.delete(route, headers=headers)
+    return response
 
 
 def add_refresh_token_cookie_to_client(
-    app: Flask, auth_manager: AuthManager, client: FlaskClient, refresh_token: str
+    app: Flask, client: FlaskClient, refresh_token: str
 ) -> None:
     """Adds a refresh_token cookie to the client in the expected format.
 
@@ -46,12 +126,11 @@ def post_token(client: FlaskClient, spotify_token: t.Optional[str] = None) -> Re
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    response: Response
-    if spotify_token:
-        response = client.post("/auth/token", json={"spotify_token": spotify_token})
-    else:
-        response = client.post("/auth/token")
-    return response
+    return _post_request(
+        client,
+        "/auth/token",
+        data={"spotify_token": spotify_token} if spotify_token else None,
+    )
 
 
 def post_refresh(client: FlaskClient) -> Response:
@@ -63,8 +142,7 @@ def post_refresh(client: FlaskClient) -> Response:
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    response: Response = client.post("/auth/refresh")
-    return response
+    return _post_request(client, "/auth/refresh")
 
 
 def post_logout(client: FlaskClient, auth_token: t.Optional[str] = None) -> Response:
@@ -78,13 +156,7 @@ def post_logout(client: FlaskClient, auth_token: t.Optional[str] = None) -> Resp
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    if auth_token:
-        response: Response = client.post(
-            "/auth/logout", headers={"Authorization": f"Bearer {auth_token}"}
-        )
-    else:
-        response = client.post("/auth/logout")
-    return response
+    return _post_request(client, "/auth/logout", auth_token)
 
 
 def get_users(client: FlaskClient, auth_token: t.Optional[str] = None) -> Response:
@@ -98,13 +170,7 @@ def get_users(client: FlaskClient, auth_token: t.Optional[str] = None) -> Respon
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    if auth_token:
-        response: Response = client.get(
-            "/users", headers={"Authorization": f"Bearer {auth_token}"}
-        )
-    else:
-        response = client.get("/users")
-    return response
+    return _get_request(client, "/users", auth_token)
 
 
 def delete_users(client: FlaskClient, auth_token: t.Optional[str] = None) -> Response:
@@ -118,13 +184,7 @@ def delete_users(client: FlaskClient, auth_token: t.Optional[str] = None) -> Res
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    if auth_token:
-        response: Response = client.delete(
-            "/users", headers={"Authorization": f"Bearer {auth_token}"}
-        )
-    else:
-        response = client.delete("/users")
-    return response
+    return _delete_request(client, "/users", auth_token)
 
 
 def get_user(
@@ -141,13 +201,7 @@ def get_user(
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    if auth_token:
-        response: Response = client.get(
-            f"/users/{username}", headers={"Authorization": f"Bearer {auth_token}"}
-        )
-    else:
-        response = client.get(f"/users/{username}")
-    return response
+    return _get_request(client, f"/users/{username}", auth_token)
 
 
 def delete_user(
@@ -166,10 +220,48 @@ def delete_user(
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    if auth_token:
-        response: Response = client.delete(
-            f"/users/{username}", headers={"Authorization": f"Bearer {auth_token}"}
-        )
-    else:
-        response = client.delete(f"/users/{username}")
-    return response
+    return _delete_request(client, f"/users/{username}", auth_token)
+
+
+def get_gifs(client: FlaskClient, auth_token: t.Optional[str] = None) -> Response:
+    """GET /gifs
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _get_request(client, "/gifs", auth_token)
+
+
+def post_gifs(
+    client: FlaskClient,
+    gif_name: str,
+    beats_per_loop: int,
+    auth_token: t.Optional[str] = None,
+) -> Response:
+    """POST /gifs
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        gif_name (:obj:`str`): The name of the Gif to add.
+        beats_per_loop (:obj:`int`): The number of beats per loop of the Gif to add.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    image_path = pathlib.Path(__file__).parent.resolve() / "test-image.gif"
+    with open(image_path, "rb") as image_file:
+        image_bytes = image_file.read()
+    return _post_request(
+        client,
+        "/gifs",
+        auth_token,
+        {"name": gif_name, "beats_per_loop": beats_per_loop, "image": image_bytes},
+        is_json=False,
+    )

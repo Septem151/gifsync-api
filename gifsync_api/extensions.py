@@ -2,12 +2,17 @@
 Extensions for the GifSync API, such as CORS support, JWT management,
 Database interaction, and Task scheduling.
 """
+import secrets
+import subprocess
 import typing as t
 
+import boto3
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_pyjwt import AuthManager
 from flask_sqlalchemy import SQLAlchemy
+from mypy_boto3_s3.client import S3Client
+from mypy_boto3_s3.service_resource import Bucket, S3ServiceResource
 from redis import Redis
 from rq import Queue
 from rq.command import send_stop_job_command
@@ -181,9 +186,156 @@ class RQ:
         return job_found
 
 
+class S3:
+    """Wrapper for an S3 client.
+
+    The S3 client is in the region "us-east-1" by default.
+
+    Args:
+        access_key (:obj:`str`, optional): The AWS Access Key. Defaults to None.
+        secret_key (:obj:`str`, optional): The AWS Secret Key. Defaults to None.
+        region_name (:obj:`str`): The AWS Region. Defaults to "us-east-1".
+        bucket_name (:obj:`str`, optional): The S3 Bucket name. Defaults to None.
+    """
+
+    def __init__(
+        self,
+        access_key: t.Optional[str] = None,
+        secret_key: t.Optional[str] = None,
+        region_name: str = "us-east-1",
+        bucket_name: t.Optional[str] = None,
+    ) -> None:
+        self._client: t.Optional[S3ServiceResource] = None
+        self._bucket_name: t.Optional[str] = bucket_name
+        if access_key and secret_key:
+            self.init_s3(access_key, secret_key, region_name)
+
+    def init_s3(
+        self,
+        access_key: str,
+        secret_key: str,
+        region_name: str = "us-east-1",
+        bucket_name: t.Optional[str] = None,
+    ) -> None:
+        """Initializes the S3 client with the given AWS credentials and region.
+
+        Args:
+            access_key (:obj:`str`): The AWS Access Key.
+            secret_key (:obj:`str`): The AWS Secret Key.
+            region_name (:obj:`str`): The AWS Region. Defaults to "us-east-1".
+            bucket_name (:obj:`str`): The S3 Bucket name.
+        """
+        self._client = boto3.resource(
+            "s3",
+            region_name=region_name,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+        )
+        if bucket_name:
+            self._bucket_name = bucket_name
+
+    @property
+    def client(self) -> S3ServiceResource:
+        """Returns the S3 client this wrapper contains.
+
+        Raises:
+            :obj:`AttributeError`: If the S3 client hasn't been initialized with
+                AWS credentials.
+
+        Returns:
+            :obj:`~mypy_boto3_s3.service_resource.S3ServiceResource`: The S3 client
+                object.
+        """
+        if not self._client:
+            raise AttributeError("S3 client was not assigned yet!")
+        return self._client
+
+    @property
+    def bucket_name(self) -> str:
+        """Returns the S3 Bucket name this wrapper operates on.
+
+        Raises:
+            :obj:`AttributeError`: If the S3 bucket name hasn't been initialized.
+
+        Returns:
+            :obj:`str`: The S3 Bucket name.
+        """
+        if not self._bucket_name:
+            raise AttributeError("Bucket name was not assigned yet!")
+        return self._bucket_name
+
+    @property
+    def bucket(self) -> Bucket:
+        """Returns the S3 Bucket this wrapper operates on.
+
+        Returns:
+            :obj:`~mypy_boto3_s3.service_resource.Bucket`: The S3 Bucket.
+        """
+        return self.client.Bucket(self.bucket_name)
+
+    def create_bucket(self) -> None:
+        """Creates the S3 Bucket this wrapper operates on if it does not exist."""
+        if not self.bucket in self.client.buckets.all():
+            self.bucket.create()
+
+    def add_image(self, image_data: bytes) -> str:
+        """Adds an image (and its thumbnail) to the S3 bucket.
+
+        Args:
+            image_data (:obj:`bytes`): Bytes encoded image.
+
+        Returns:
+            :obj:`str`: Name of the image in the S3 bucket.
+        """
+        image_name = secrets.token_hex(16)
+        self.bucket.put_object(Key=f"{image_name}.gif", Body=image_data)
+        try:
+            thumb_cmd = subprocess.run(
+                ["gifsicle", "-", "#0", "--resize", "140x140"],
+                input=image_data,
+                capture_output=True,
+                check=True,
+            )
+            thumb_data = thumb_cmd.stdout
+            self.bucket.put_object(Key=f"thumbs/{image_name}.gif", Body=thumb_data)
+        except subprocess.CalledProcessError as error:
+            # TODO: Handle error better by logging rather than crashing
+            raise RuntimeError("Could not make thumbnail") from error
+        return image_name
+
+    def get_image_url(self, image_name: str) -> str:
+        """Gets a presigned URL for an image from the S3 bucket.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+
+        Returns:
+            :obj:`str`: Presigned URL for the image in the S3 bucket.
+        """
+        s3client: S3Client = self.client.meta.client  # type: ignore
+        image_url = s3client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self.bucket_name, "Key": f"{image_name}.gif"},
+            ExpiresIn=3600,
+        )
+        return image_url
+
+    def get_thumb_url(self, image_name: str) -> str:
+        """Gets a presigned URL for an image thumbnail from the S3 bucket.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+
+        Returns:
+            :obj:`str`: Presigned URL for the thumbnail in the S3 bucket.
+        """
+        return self.get_image_url(f"thumbs/{image_name}")
+
+
 auth_manager = AuthManager()
 cors = CORS()
 db = SQLAlchemy()
 redis_client = RedisClient()
 rq_queue = RQ()
 migrate = Migrate()
+s3 = S3()

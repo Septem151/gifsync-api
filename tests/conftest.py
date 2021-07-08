@@ -1,14 +1,14 @@
 """Fixtures used for Test cases."""
+# pylint: disable=wrong-import-order
 import typing as t
 
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 from gifsync_api import create_app
-from gifsync_api.extensions import db
-
-# pylint: disable=wrong-import-order
+from gifsync_api.extensions import db, s3
 from gifsync_api.models import Gif, GifSyncUser, Role
+from moto import mock_s3
 
 
 @pytest.fixture(name="app", scope="session")
@@ -18,14 +18,16 @@ def fixture_app() -> t.Generator[Flask, None, None]:
     Yields:
         :obj:`Generator[FlaskClient, None, None]`: Flask app.
     """
-    app = create_app("testing")
-    app.config["TESTING"] = True
-    with app.app_context():
-        db.create_all()
-    yield app
+    with mock_s3():
+        app = create_app("testing")
+        app.config["TESTING"] = True
+        with app.app_context():
+            db.create_all()
+        s3.create_bucket()
+        yield app
 
-    with app.app_context():
-        db.drop_all()
+        with app.app_context():
+            db.drop_all()
 
 
 @pytest.fixture(name="client", scope="function")

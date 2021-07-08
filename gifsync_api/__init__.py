@@ -9,7 +9,7 @@ from flask import Flask
 from werkzeug.exceptions import HTTPException
 
 from .config import Config
-from .extensions import auth_manager, cors, db, migrate, redis_client, rq_queue
+from .extensions import auth_manager, cors, db, migrate, redis_client, rq_queue, s3
 from .models import Gif, GifSyncUser, Role, assigned_role
 from .routes import blueprints
 
@@ -49,6 +49,11 @@ def register_extensions(app: Flask) -> None:
     redis_client.init_redis(app.config["REDIS_URL"])
     rq_queue.init_queue(redis_client.client)
     db.init_app(app)
+    s3.init_s3(
+        access_key=app.config["AWS_ACCESS_KEY"],
+        secret_key=app.config["AWS_SECRET_KEY"],
+        bucket_name=app.config["AWS_S3_BUCKET"],
+    )
     migrate.init_app(app, db)
 
 

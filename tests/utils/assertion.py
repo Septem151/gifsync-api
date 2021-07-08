@@ -7,8 +7,8 @@ from werkzeug.http import parse_cookie
 
 
 def assert_user_in_response(response: Response) -> None:
-    """Assert that the response's body is json and contains a "username" and
-    "gifs" value.
+    """Assert that the response's body is json and contains a "username", "id",
+    and "gifs" value.
 
     Args:
         response (:obj:`~flask.Response`): The Flask Response object to check.
@@ -18,9 +18,32 @@ def assert_user_in_response(response: Response) -> None:
     assert "user" in json_data
     user_json = json_data["user"]
     assert isinstance(user_json, dict)
+    assert "id" in user_json
+    assert isinstance(user_json["id"], int)
     assert "username" in user_json
     assert "gifs" in user_json
     assert isinstance(user_json["gifs"], list)
+
+
+def assert_gif_in_response(response: Response) -> None:
+    """Assert that the response's body is json and contains an "id", "name",
+    "beats_per_loop", "image", and "custom_tempo" value.
+
+    Args:
+        response (:obj:`~flask.Response`): The Flask Response object to check.
+    """
+    json_data: t.Optional[dict] = response.get_json()
+    assert json_data is not None
+    assert "gif" in json_data
+    gif_json = json_data["gif"]
+    assert isinstance(gif_json, dict)
+    assert "id" in gif_json
+    assert isinstance(gif_json["id"], int)
+    assert "name" in gif_json
+    assert "image" in gif_json
+    assert "beats_per_loop" in gif_json
+    assert isinstance(gif_json["beats_per_loop"], int)
+    assert "custom_tempo" in gif_json
 
 
 def assert_error_response(response: Response, status: HTTPStatus) -> None:

@@ -1,9 +1,12 @@
 """Testing utils for generating data."""
+import pathlib
+import random
 import typing as t
 import uuid
 
-from flask_pyjwt import JWT, AuthData, AuthManager, TokenType
-from gifsync_api.models import GifSyncUser
+from flask_pyjwt import JWT, AuthData, TokenType
+from gifsync_api.extensions import auth_manager, s3
+from gifsync_api.models import Gif, GifSyncUser
 
 
 def create_random_username() -> str:
@@ -16,7 +19,6 @@ def create_random_username() -> str:
 
 
 def create_auth_token(
-    auth_manager: AuthManager,
     username: str,
     admin: t.Optional[bool] = False,
     spotify: t.Optional[bool] = False,
@@ -41,8 +43,21 @@ def create_auth_token(
     return auth_token
 
 
+def create_refresh_token(username: str) -> JWT:
+    """Creates and returns a refresh token with a "sub" of the
+    username given.
+
+    Args:
+        username (:obj:`str`): Username to provision the refresh token to.
+
+    Returns:
+        :obj:`~flask_pyjwt.JWT`: The signed refresh token.
+    """
+    refresh_token: JWT = auth_manager.refresh_token(username)
+    return refresh_token
+
+
 def create_expired_auth_token(
-    auth_manager: AuthManager,
     username: str,
     admin: t.Optional[bool] = False,
     spotify: t.Optional[bool] = False,
@@ -78,7 +93,7 @@ def create_expired_auth_token(
     return auth_token
 
 
-def create_expired_refresh_token(auth_manager: AuthManager, username: str) -> JWT:
+def create_expired_refresh_token(username: str) -> JWT:
     """Creates and returns an expired refresh token with a "sub" of the username given.
 
     Works by creating a new signer object based on the auth_manager's data, but sets
@@ -116,9 +131,32 @@ def populate_database_with_users(
         extra_username (:obj:`str`): An optional extra user to create with the
             given username.
     """
-    for _ in range(0, 20):
+    for _ in range(0, 10):
         username = create_random_username()
         db_session.add(GifSyncUser(username=username))
     if extra_username:
         db_session.add(GifSyncUser(username=extra_username))
+    db_session.commit()
+
+
+def populate_users_with_gifs(db_session) -> None:
+    """Populates the test database and S3 bucket with gifs.
+
+    Args:
+        db_session: The Database session fixture.
+    """
+    users = GifSyncUser.get_all()
+    for user in users:
+        test_image_path = pathlib.Path(__file__).parent.resolve() / "test-image.gif"
+        for _ in range(0, 4):
+            with open(test_image_path, "rb") as image_file:
+                image_bytes = image_file.read()
+                image_name = s3.add_image(image_bytes)
+            gif = Gif(
+                name=create_random_username(),
+                owner=user,
+                image=image_name,
+                beats_per_loop=random.randint(1, 12),
+            )
+            db_session.add(gif)
     db_session.commit()
