@@ -257,6 +257,27 @@ class Gif(db.Model):  # pylint: disable=too-few-public-methods
         return gif
 
     @classmethod
+    def get_by_username_and_name(
+        cls, username: str, gif_name: str
+    ) -> t.Optional["Gif"]:
+        """Gets a gif by its owner and its name, if it exists.
+
+        Args:
+            username (:obj:`str`): Owner of gif.
+            gif_name (:obj:`str`): Name of gif.
+
+        Returns:
+            :obj:`~gifsync_api.models.Gif` | ``None``: The gif if it exists,
+                otherwise None.
+        """
+        gif: t.Optional["Gif"] = (
+            cls.query.join(Gif.owner)
+            .filter(GifSyncUser.username == username, cls.name == gif_name)
+            .first()
+        )
+        return gif
+
+    @classmethod
     def get_all(cls) -> t.List["Gif"]:
         """Gets a list of all gifs.
 

@@ -284,3 +284,20 @@ def delete_gifs(client: FlaskClient, auth_token: t.Optional[str] = None) -> Resp
         :obj:`~flask.Response`: The Flask Response object.
     """
     return _delete_request(client, "/gifs", auth_token)
+
+
+def get_gif(
+    client: FlaskClient, gif_id: int, auth_token: t.Optional[str] = None
+) -> Response:
+    """GET /gifs/<gif_id>
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        gif_id (:obj:`int`): The gif id.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _get_request(client, f"/gifs/{gif_id}", auth_token)

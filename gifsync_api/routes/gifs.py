@@ -72,3 +72,73 @@ def delete_gifs_route():
     Gif.delete_all()
     db.session.commit()
     return "", HTTPStatus.NO_CONTENT
+
+
+@gifs_blueprint.route("/<int:gif_id>", methods=["GET"])
+@require_token()
+def get_gif_route(gif_id: int):
+    """GET /gifs/<gif_id>
+
+    Gets a gif with specified gif id. Token's "sub" must match
+    owner's username of the gif, unless an admin.
+
+    Args:
+        gif_id (:obj:`int`): The gif id to get.
+    """
+    gif = Gif.get_by_id(gif_id)
+    if not gif:
+        return {"error": f"Gif with the id {gif_id} not found"}, HTTPStatus.NOT_FOUND
+    token_username: str = current_token.sub  # type: ignore
+    if (
+        not bool(current_token.scope["admin"])  # type: ignore
+        and gif.owner.username != token_username
+    ):
+        return {
+            "error": "unable to access gif owned by another user"
+        }, HTTPStatus.FORBIDDEN
+    return gif.to_json(), HTTPStatus.OK
+
+
+@gifs_blueprint.route("/<int:gif_id>", methods=["POST"])
+@require_token()
+def post_gif_route(gif_id: int):  # pylint: disable=too-many-return-statements
+    """POST /gifs/<gif_id>
+
+    Modifies a gif with specified gif id. Token's "sub" must match
+    owner's username of the gif, unless an admin.
+
+    Args:
+        gif_id (:obj:`int`): The gif id to modify.
+    """
+    gif = Gif.get_by_id(gif_id)
+    if not gif:
+        return {"error": f"Gif with the id {gif_id} not found"}, HTTPStatus.NOT_FOUND
+    token_username: str = current_token.sub  # type: ignore
+    if (
+        not bool(current_token.scope["admin"])  # type: ignore
+        and gif.owner.username != token_username
+    ):
+        return {
+            "error": "unable to modify gif owned by another user"
+        }, HTTPStatus.FORBIDDEN
+    req_json: t.Optional[dict] = request.get_json()
+    if not req_json:
+        return {"error": "missing request body"}, HTTPStatus.BAD_REQUEST
+    if "name" in req_json:
+        gif_name = req_json["name"]
+        for user_gif in gif.owner.gifs:
+            if user_gif.name == gif_name:
+                return {"error": "duplicate gif name"}, HTTPStatus.BAD_REQUEST
+        gif.name = gif_name
+    if "beats_per_loop" in req_json:
+        beats_per_loop = req_json["beats_per_loop"]
+        if not isinstance(beats_per_loop, (int, float)):
+            return {"error": "beats_per_loop must be a number"}, HTTPStatus.BAD_REQUEST
+        gif.beats_per_loop = beats_per_loop
+    if "custom_tempo" in req_json:
+        custom_tempo = req_json["custom_tempo"]
+        if not isinstance(custom_tempo, (int, float)):
+            return {"error": "custom_tempo must be a number"}, HTTPStatus.BAD_REQUEST
+        gif.custom_tempo = custom_tempo
+    db.session.commit()
+    return gif.to_json(), HTTPStatus.OK
