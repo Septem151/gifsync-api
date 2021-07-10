@@ -139,24 +139,39 @@ def populate_database_with_users(
     db_session.commit()
 
 
-def populate_users_with_gifs(db_session) -> None:
+def populate_users_with_gifs(
+    db_session, extra_user_gif: t.Optional[t.Tuple[str, str]] = None
+) -> None:
     """Populates the test database and S3 bucket with gifs.
 
     Args:
         db_session: The Database session fixture.
+        extra_user_gif (:obj:`tuple`, optional): Tuple containing
+            an extra username and a gif name to add.
     """
+    if extra_user_gif:
+        db_session.add(GifSyncUser(username=extra_user_gif[0]))
+        db_session.commit()
     users = GifSyncUser.get_all()
     for user in users:
         test_image_path = pathlib.Path(__file__).parent.resolve() / "test-image.gif"
-        for _ in range(0, 4):
-            with open(test_image_path, "rb") as image_file:
-                image_bytes = image_file.read()
+        with open(test_image_path, "rb") as image_file:
+            image_bytes = image_file.read()
+            for _ in range(0, 4):
                 image_name = s3.add_image(image_bytes)
-            gif = Gif(
-                name=create_random_username(),
-                owner=user,
-                image=image_name,
-                beats_per_loop=random.randint(1, 12),
-            )
-            db_session.add(gif)
+                gif = Gif(
+                    name=create_random_username(),
+                    owner=user,
+                    image=image_name,
+                    beats_per_loop=random.randint(1, 12),
+                )
+                db_session.add(gif)
+            if extra_user_gif and user.username == extra_user_gif[0]:
+                image_name = s3.add_image(image_bytes)
+                gif = Gif(
+                    name=extra_user_gif[1],
+                    owner=user,
+                    image=image_name,
+                    beats_per_loop=random.randint(1, 12),
+                )
     db_session.commit()

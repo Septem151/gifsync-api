@@ -1,4 +1,5 @@
 """Testing utils for making requests to the GifSync API."""
+import io
 import pathlib
 import typing as t
 
@@ -51,7 +52,7 @@ def _post_request(
     Returns:
         :obj:`~flask.Response`: The Flask Response object.
     """
-    kwargs = {}
+    kwargs: dict = {"headers": {}}
     if auth_token:
         kwargs["headers"] = {"Authorization": f"Bearer {auth_token}"}
     if data:
@@ -60,8 +61,8 @@ def _post_request(
             kwargs["headers"]["Content-Type"] = "application/json"
         else:
             kwargs["data"] = data
-            kwargs["headers"]["Content-Type"] = "application/x-www-form-urlencoded"
-    response: Response = client.post(route, **kwargs)  # type: ignore
+            kwargs["headers"]["Content-Type"] = "multipart/form-data"
+    response: Response = client.post(route, **kwargs)
     return response
 
 
@@ -262,6 +263,24 @@ def post_gifs(
         client,
         "/gifs",
         auth_token,
-        {"name": gif_name, "beats_per_loop": beats_per_loop, "image": image_bytes},
+        {
+            "name": gif_name,
+            "beats_per_loop": beats_per_loop,
+            "image": (io.BytesIO(image_bytes), "test-image.gif"),
+        },
         is_json=False,
     )
+
+
+def delete_gifs(client: FlaskClient, auth_token: t.Optional[str] = None) -> Response:
+    """DELETE /gifs
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _delete_request(client, "/gifs", auth_token)

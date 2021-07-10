@@ -19,7 +19,7 @@ def get_users_route():
     Returns a list of all users. Only accessible by admins.
     """
     users: t.List[GifSyncUser] = GifSyncUser.get_all()
-    return {"users": [user.to_json() for user in users]}, 200
+    return {"users": [user.to_json() for user in users]}, HTTPStatus.OK
 
 
 @users_blueprint.route("", methods=["DELETE"])
@@ -31,7 +31,7 @@ def delete_users_route():
     """
     GifSyncUser.delete_all()
     db.session.commit()
-    return "", 204
+    return "", HTTPStatus.NO_CONTENT
 
 
 @users_blueprint.route("/<string:username>", methods=["GET"])

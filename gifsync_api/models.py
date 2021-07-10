@@ -5,7 +5,7 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql import expression
 from sqlalchemy.types import DateTime
 
-from .extensions import db
+from .extensions import db, s3
 
 
 class UtcNow(
@@ -237,6 +237,7 @@ class Gif(db.Model):  # pylint: disable=too-few-public-methods
             "owner": self.owner.username,
             "name": self.name,
             "image": self.image,
+            "image_url": s3.get_image_url(self.image),
             "beats_per_loop": self.beats_per_loop,
             "custom_tempo": self.custom_tempo,
         }
