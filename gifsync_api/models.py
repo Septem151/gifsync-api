@@ -1,12 +1,16 @@
 """Model representations for objects stored in the GifSync API's database."""
+import typing as t
+
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql import expression
 from sqlalchemy.types import DateTime
 
-from .extensions import db
+from .extensions import db, s3
 
 
-class UtcNow(expression.FunctionElement):  # pylint: disable=too-many-ancestors
+class UtcNow(
+    expression.FunctionElement
+):  # pylint: disable=too-many-ancestors,abstract-method
     """Class for getting UTC timestamp from postgres server.
 
     This class is required by SQLAlchemy.
@@ -26,7 +30,55 @@ def pg_utcnow(element, compiler, **kwargs):  # pylint: disable=unused-argument
     return "TIMEZONE('utc', CURRENT_TIMESTAMP)"
 
 
-class User(db.Model):  # pylint: disable=too-few-public-methods
+assigned_role = db.Table(
+    "AssignedRole",
+    db.Column(
+        "role_id",
+        db.Integer,
+        db.ForeignKey("Role.id"),
+        primary_key=True,
+        nullable=False,
+    ),
+    db.Column(
+        "user_id",
+        db.Integer,
+        db.ForeignKey("GifSyncUser.id"),
+        primary_key=True,
+        nullable=False,
+    ),
+)
+
+
+class Role(db.Model):  # pylint: disable=too-few-public-methods
+    """Model representing a Role that a user can have, such as "admin" or "spotify".
+
+    * name: The name of the role.
+    """
+
+    __tablename__ = "Role"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, nullable=False)
+    name = db.Column(db.String(80), nullable=False)
+
+    @classmethod
+    def get_by_name(cls, name: str) -> "Role":
+        """Gets a role by name.
+
+        Args:
+            name (:obj:`str`): Name of role to get.
+
+        Raises:
+            :obj:`ValueError`: If a role with the given name does not exist.
+
+        Returns:
+            :obj:`~gifsync_api.models.Role`: The role.
+        """
+        role: t.Optional["Role"] = cls.query.filter_by(name=name).first()
+        if not role:
+            raise ValueError(f"Role with the name {name} does not exist")
+        return role
+
+
+class GifSyncUser(db.Model):  # pylint: disable=too-few-public-methods
     """Model representing a User object in the database.
 
     User has 3 columns: id, username, and created_at.
@@ -46,6 +98,98 @@ class User(db.Model):  # pylint: disable=too-few-public-methods
     gifs = db.relationship(
         "Gif", backref="owner", cascade="all, delete-orphan", passive_deletes=True
     )
+    roles = db.relationship(
+        "Role",
+        secondary=assigned_role,
+        lazy="subquery",
+        backref=db.backref("users", lazy=True),
+    )
+
+    def has_role(self, role_name: str) -> bool:
+        """Returns whether the user is assigned a role with the given name.
+
+        Args:
+            role_name (:obj:`str`): The role's name.
+
+        Returns:
+            :obj:`bool`: True if user has assigned role, otherwise False.
+        """
+        roles: t.List[Role] = self.roles
+        for role in roles:  # pylint: disable=not-an-iterable
+            if role.name == role_name:
+                return True
+        return False
+
+    def set_role(self, role_name: str, value: bool) -> None:
+        """Gives or removes a user's role based on the value provided.
+
+        Args:
+            role_name (:obj:`str`): The role's name.
+            value (:obj:`bool`): Whether to give or remove the role.
+        """
+        roles: t.List[Role] = self.roles
+        role: Role = Role.get_by_name(role_name)
+        if self.has_role(role_name) and not value:
+            roles.remove(role)
+        elif not self.has_role(role_name) and value:
+            roles.append(role)
+
+    def to_json(self) -> dict:
+        """JSON representation of the GifSyncUser.
+
+        Returns:
+            :obj:`dict`: JSON representation.
+        """
+        return {
+            "id": self.id,
+            "username": self.username,
+            "gifs": [
+                gif.to_json() for gif in self.gifs  # pylint: disable=not-an-iterable
+            ],
+        }
+
+    @classmethod
+    def get_by_username(cls, username: str) -> t.Optional["GifSyncUser"]:
+        """Gets a user by their username if they exist, otherwise None.
+
+        Args:
+            username (:obj:`str`): Username of user to get.
+
+        Returns:
+            :obj:`~gifsync_api.models.GifSyncUser` | ``None``: The user if they
+                exist, otherwise None.
+        """
+        user: t.Optional["GifSyncUser"] = cls.query.filter_by(username=username).first()
+        return user
+
+    @classmethod
+    def get_by_id(cls, user_id: int) -> t.Optional["GifSyncUser"]:
+        """Gets a user by their id if they exist, otherwise None.
+
+        Args:
+            id (:obj:`int`): Id of user to get.
+
+        Returns:
+            :obj:`~gifsync_api.models.GifSyncUser` | ``None``: The user if they
+                exist, otherwise None.
+        """
+        user: t.Optional["GifSyncUser"] = cls.query.filter_by(id=user_id).first()
+        return user
+
+    @classmethod
+    def get_all(cls) -> t.List["GifSyncUser"]:
+        """Gets a list of all users.
+
+        Returns:
+            list of :obj:`~gifsync_api.models.GifSyncUser`: All users.
+        """
+        users: t.List["GifSyncUser"] = cls.query.all()
+        return users
+
+    @classmethod
+    def delete_all(cls) -> None:
+        """Deletes all users."""
+        cls.query.delete()
 
 
 class Gif(db.Model):  # pylint: disable=too-few-public-methods
@@ -55,13 +199,12 @@ class Gif(db.Model):  # pylint: disable=too-few-public-methods
     beats_per_loop, and custom_tempo.
 
     * id: int, standard sequential primary key. Not nullable.
-    * owner_id: int, foreign key for the GifSyncUser that created this gif.
+    * user_id: int, foreign key for the GifSyncUser that created this gif.
         Is a primary key. Not nullable.
     * created_at: timestamp, utc timestamp based on server time. Not nullable,
         autogenerated.
     * name: string, name of the gif. Not nullable.
-    * image: string, URL pointing to an image. Not nullable.
-    * thumbnail: string, URL pointing to an image. Not nullable.
+    * image: string, name of image in S3 Bucket. Not nullable.
     * beats_per_loop: float, the beats per loop of the gif. Not nullable.
     * custom_tempo: float, a custom tempo (if any) chosen for this gif to play at.
 
@@ -70,7 +213,7 @@ class Gif(db.Model):  # pylint: disable=too-few-public-methods
 
     __tablename__ = "Gif"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, nullable=False)
-    owner_id = db.Column(
+    user_id = db.Column(
         db.Integer,
         db.ForeignKey("GifSyncUser.id", ondelete="CASCADE"),
         primary_key=True,
@@ -78,7 +221,73 @@ class Gif(db.Model):  # pylint: disable=too-few-public-methods
     )
     name = db.Column(db.String(80), nullable=False)
     image = db.Column(db.String(256), nullable=False)
-    thumbnail = db.Column(db.String(256), nullable=False)
     beats_per_loop = db.Column(db.Float, nullable=False)
     custom_tempo = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, server_default=UtcNow(), nullable=False)
+
+    def to_json(self) -> dict:
+        """JSON representation of the Gif.
+
+        Returns:
+            :obj:`dict`: JSON representation.
+        """
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "owner": self.owner.username,
+            "name": self.name,
+            "image": self.image,
+            "image_url": s3.get_image_url(self.image),
+            "beats_per_loop": self.beats_per_loop,
+            "custom_tempo": self.custom_tempo,
+        }
+
+    @classmethod
+    def get_by_id(cls, gif_id: int) -> t.Optional["Gif"]:
+        """Gets a gif by id if it exists, otherwise None.
+
+        Args:
+            id (:obj:`int`): Id of gif to get.
+
+        Returns:
+            :obj:`~gifsync_api.models.Gif` | ``None``: The gif if it exists,
+                otherwise None.
+        """
+        gif: t.Optional["Gif"] = cls.query.filter_by(id=gif_id).first()
+        return gif
+
+    @classmethod
+    def get_by_username_and_name(
+        cls, username: str, gif_name: str
+    ) -> t.Optional["Gif"]:
+        """Gets a gif by its owner and its name, if it exists.
+
+        Args:
+            username (:obj:`str`): Owner of gif.
+            gif_name (:obj:`str`): Name of gif.
+
+        Returns:
+            :obj:`~gifsync_api.models.Gif` | ``None``: The gif if it exists,
+                otherwise None.
+        """
+        gif: t.Optional["Gif"] = (
+            cls.query.join(Gif.owner)
+            .filter(GifSyncUser.username == username, cls.name == gif_name)
+            .first()
+        )
+        return gif
+
+    @classmethod
+    def get_all(cls) -> t.List["Gif"]:
+        """Gets a list of all gifs.
+
+        Returns:
+            list of :obj:`~gifsync_api.models.Gif`: All gifs.
+        """
+        gifs: t.List["Gif"] = cls.query.all()
+        return gifs
+
+    @classmethod
+    def delete_all(cls) -> None:
+        """Deletes all gifs."""
+        cls.query.delete()
