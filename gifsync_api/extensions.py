@@ -7,12 +7,14 @@ import subprocess
 import typing as t
 
 import boto3
+from botocore.exceptions import ClientError
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_pyjwt import AuthManager
 from flask_sqlalchemy import SQLAlchemy
 from mypy_boto3_s3.client import S3Client
 from mypy_boto3_s3.service_resource import Bucket, S3ServiceResource
+from mypy_boto3_s3.type_defs import DeleteObjectsOutputTypeDef, GetObjectOutputTypeDef
 from redis import Redis
 from rq import Queue
 from rq.command import send_stop_job_command
@@ -284,6 +286,9 @@ class S3:
         Args:
             image_data (:obj:`bytes`): Bytes encoded image.
 
+        Raises:
+            :obj:`RuntimeError`: If gifsicle could not make a thumbnail.
+
         Returns:
             :obj:`str`: Name of the image in the S3 bucket.
         """
@@ -302,6 +307,62 @@ class S3:
             # TODO: Handle error better by logging rather than crashing
             raise RuntimeError("Could not make thumbnail") from error
         return image_name
+
+    def update_image(self, image_name: str, image_data: bytes) -> bool:
+        """Updates an existing image in the S3 bucket, if there is one.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+            image_data (:obj:`bytes`): Bytes encoded image.
+
+        Returns:
+            True if the image existed and was updated, otherwise False.
+        """
+        try:
+            s3_object = self.bucket.Object(f"{image_name}.gif")
+            s3_object.load()
+            self.bucket.put_object(Key=f"{image_name}.gif", Body=image_data)
+        except ClientError:
+            return False
+        return True
+
+    def get_image(self, image_name: str) -> t.Optional[bytes]:
+        """Gets an image as bytes from the S3 bucket, if it exists.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+
+        Returns:
+            :obj:`bytes`: The image bytes if exists, else None.
+        """
+        try:
+            s3_object = self.bucket.Object(f"{image_name}.gif")
+            s3_image: GetObjectOutputTypeDef = s3_object.get()
+            image_bytes = s3_image["Body"].read()
+            return image_bytes
+        except ClientError:
+            return None
+
+    def delete_image(self, image_name: str) -> DeleteObjectsOutputTypeDef:
+        """Deletes an image (and its thumbnail) if it exists from the S3 bucket.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+
+        Returns:
+            :obj:`~mypy_boto3_s3.type_defs.DeleteObjectsOutputTypeDef`: Response
+                from S3 about the result of the deletion.
+        """
+        response: DeleteObjectsOutputTypeDef = self.bucket.delete_objects(
+            Delete={
+                "Objects": [
+                    {"Key": f"{image_name}.gif"},
+                    {"Key": f"thumbs/{image_name}.gif"},
+                ],
+                "Quiet": True,
+            }
+        )
+        return response
 
     def get_image_url(self, image_name: str) -> str:
         """Gets a presigned URL for an image from the S3 bucket.

@@ -5,7 +5,8 @@ from http import HTTPStatus
 from flask import Blueprint, request
 from flask_pyjwt import current_token, require_token
 
-from ..extensions import db, s3
+from ..extensions import db, rq_queue, s3
+from ..jobs import sync_gif
 from ..models import Gif, GifSyncUser
 
 gifs_blueprint = Blueprint("gifs", __name__, url_prefix="/gifs")
@@ -142,3 +143,66 @@ def post_gif_route(gif_id: int):  # pylint: disable=too-many-return-statements
         gif.custom_tempo = custom_tempo
     db.session.commit()
     return gif.to_json(), HTTPStatus.OK
+
+
+@gifs_blueprint.route("/<int:gif_id>", methods=["DELETE"])
+@require_token()
+def delete_gif_route(gif_id: int):
+    """DELETE /gifs/<gif_id>
+
+    Deletes a gif with specified gif id. Token's "sub" must match
+    owner's username of the gif, unless an admin.
+
+    Args:
+        gif_id (:obj:`int`): The gif id to modify.
+    """
+    gif = Gif.get_by_id(gif_id)
+    if not gif:
+        return {"error": f"Gif with the id {gif_id} not found"}, HTTPStatus.NOT_FOUND
+    token_username: str = current_token.sub  # type: ignore
+    if (
+        not bool(current_token.scope["admin"])  # type: ignore
+        and gif.owner.username != token_username
+    ):
+        return {
+            "error": "unable to delete gif owned by another user"
+        }, HTTPStatus.FORBIDDEN
+    s3_response = s3.delete_image(gif.image)
+    if "Errors" in s3_response:
+        return {
+            "error": "unable to delete gif images"
+        }, HTTPStatus.INTERNAL_SERVER_ERROR
+    db.session.delete(gif)
+    db.session.commit()
+    return "", HTTPStatus.NO_CONTENT
+
+
+@gifs_blueprint.route("/<int:gif_id>/sync", methods=["POST"])
+@require_token()
+def post_gif_sync_route(gif_id: int):
+    """POST /gifs/<gif_id>/sync
+
+    Queues a task to sync a gif with specified gif id. Token's "sub"
+    must match owner's username of the gif, unless an admin.
+
+    Args:
+        gif_id (:obj:`int`): The gif id to sync.
+    """
+    gif = Gif.get_by_id(gif_id)
+    if not gif:
+        return {"error": f"Gif with the id {gif_id} not found"}, HTTPStatus.NOT_FOUND
+    token_username: str = current_token.sub  # type: ignore
+    if (
+        not bool(current_token.scope["admin"])  # type: ignore
+        and gif.owner.username != token_username
+    ):
+        return {
+            "error": "unable to sync gif owned by another user"
+        }, HTTPStatus.FORBIDDEN
+    req_json: t.Optional[dict] = request.get_json()
+    if req_json and "tempo" in req_json and isinstance(req_json["tempo"], (int, float)):
+        tempo: float = req_json["tempo"]
+    else:
+        return {"error": "tempo must be specified in body"}, HTTPStatus.BAD_REQUEST
+    job = rq_queue.add_job(sync_gif, gif.image, tempo, gif.beats_per_loop)
+    return {"task_id": job.id}, HTTPStatus.OK
