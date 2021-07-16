@@ -7,7 +7,73 @@ on:
     branches: [master, development]
 
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache pip
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-pip
+        with:
+          path: ~/.cache/pip
+          key:
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{
+            hashFiles('poetry.lock') }}
+
+      - name: Cache poetry
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-poetry
+        with:
+          path: .cache
+          key:
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{
+            hashFiles('poetry.lock') }}
+
+      - name: Cache venv
+        id: cache-venv
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-venv
+        with:
+          path: .venv
+          key:
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{
+            hashFiles('poetry.lock') }}
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: |
+          poetry install -E development
+
+      - name: Lint with pylint
+        run: |
+          set -e
+          poetry run pylint gifsync_api/ tests/ doc/
+
+      - name: Lint with mypy
+        run: |
+          set -e
+          poetry run mypy .
+
+      - name: Lint with black
+        run: |
+          set -e
+          poetry run black . --check
+
+  test:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -22,7 +88,6 @@ jobs:
         options:
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s
           --health-retries 5
-
     steps:
       - name: Cache gifsicle
         id: cache-gifsicle
@@ -77,6 +142,7 @@ jobs:
             hashFiles('poetry.lock') }}
 
       - name: Cache venv
+        id: cache-venv
         uses: actions/cache@v2
         env:
           cache-name: cache-venv
@@ -91,26 +157,15 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Install dependencies
+      - name: Install poetry
         run: |
           python -m pip install --upgrade pip
           pip install poetry
+
+      - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: |
           poetry install -E development
-
-      - name: Lint with pylint
-        run: |
-          set -e
-          poetry run pylint gifsync_api/ tests/ doc/
-
-      - name: Lint with mypy
-        run: |
-          set -e
-          poetry run mypy .
-
-      - name: Lint with black
-        run: |
-          set -e
-          poetry run black . --check
 
       - name: Create .flaskenv
         run: |
