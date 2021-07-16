@@ -1,0 +1,126 @@
+name: Lint and Test GifSync API
+
+on:
+  push:
+    branches: [master, development]
+  pull_request:
+    branches: [master, development]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testing
+        ports:
+          - 5432:5432
+        # needed because the postgres container does not provide a healthcheck
+        options:
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Install gifsicle
+        run: |
+          wget -c http://www.lcdf.org/gifsicle/gifsicle-1.93.tar.gz -O - \
+          | tar -xz -C /tmp
+          cd /tmp/gifsicle-1.93
+          ./configure --disable-gifview --disable-gifdiff
+          make
+          make install
+
+      - uses: actions/checkout@v2
+
+      - name: Cache pip
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-pip
+        with:
+          path: ~/.cache/pip
+          key:
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{
+            hashFiles('poetry.lock') }}
+
+      - name: Cache poetry
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-poetry
+        with:
+          path: .cache
+          key:
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{
+            hashFiles('poetry.lock') }}
+
+      - name: Cache venv
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-venv
+        with:
+          path: .venv
+          key:
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{
+            hashFiles('poetry.lock') }}
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install -E development
+
+      - name: Lint with pylint
+        run: |
+          set -e
+          poetry run pylint gifsync_api/ tests/ doc/
+
+      - name: Lint with mypy
+        run: |
+          set -e
+          poetry run mypy .
+
+      - name: Lint with black
+        run: |
+          set -e
+          poetry run black . --check
+
+      - name: Create .flaskenv
+        run: |
+          touch .flaskenv
+          echo "FLASK_ENV=\"testing\"" >> .flaskenv
+          echo "FLASK_APP=\"gifsync_api:create_app('\${FLASK_ENV}')\"" >> .flaskenv
+
+      - name: Create .env.testing
+        run: |
+          touch .env.testing
+          echo "DOMAIN=\"dev.localhost\"" >> .env.testing
+          echo "JWT_ISSUER=\"GifSync\"" >> .env.testing
+          echo "JWT_AUTHTYPE=\"HS256\"" >> .env.testing
+          echo "JWT_AUTHMAXAGE=3600" >> .env.testing
+          echo "JWT_REFRESHMAXAGE=262800" >> .env.testing
+          echo "CORS_ORIGINS=\"http://dev.localhost:3000\"" >> .env.testing
+          echo "SQLALCHEMY_DATABASE_URI=\"postgresql://postgres:postgres@localhost:5432/testing\"" >> .env.testing
+          echo "REDIS_URL=\"redis://localhost:6379/0\"" >> .env.testing
+          echo "CLIENT_ID=\"testing\"" >> .env.testing
+          echo "CLIENT_SECRET=\"testing\"" >> .env.testing
+          echo "REDIRECT_URI=\"http://dev.localhost:3000/callback\"" >> .env.testing
+          echo "AWS_ACCESS_KEY=\"testing\"" >> .env.testing
+          echo "AWS_SECRET_KEY=\"testing\"" >> .env.testing
+          echo "AWS_S3_BUCKET=\"testing\"" >> .env.testing
+
+      - name: Migrate database
+        run: |
+          set -e
+          poetry run flask db upgrade
+
+      - name: Test with pytest
+        run: |
+          set -e
+          poetry run pytest
