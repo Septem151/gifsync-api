@@ -8,6 +8,7 @@ import typing as t
 
 import boto3
 from botocore.exceptions import ClientError
+from fakeredis import FakeStrictRedis
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_pyjwt import AuthManager
@@ -27,22 +28,31 @@ class RedisClient:
     Args:
         redis_url (:obj:`str`, optional): The Redis connection string.
             Ex: "redis://localhost:6379/0". Defaults to None.
+        test_mode (:obj:`bool`, optional): Whether the redis client should be
+            in test mode. Defaults to False.
     """
 
-    def __init__(self, redis_url: t.Optional[str] = None) -> None:
+    def __init__(
+        self, redis_url: t.Optional[str] = None, test_mode: bool = False
+    ) -> None:
 
         self._client: t.Optional[Redis] = None
         if redis_url:
-            self.init_redis(redis_url)
+            self.init_redis(redis_url, test_mode)
 
-    def init_redis(self, redis_url: str) -> None:
+    def init_redis(self, redis_url: str, test_mode: bool = False) -> None:
         """Initializes the Redis client with the given connection string.
 
         Args:
             redis_url (:obj:`str`): The Redis connection string.
                 Ex: "redis://localhost:6379/0"
+            test_mode (:obj:`bool`, optional): Whether the redis client should
+                be in test mode. Defaults to False.
         """
-        self._client = Redis.from_url(redis_url)
+        if test_mode:
+            self._client = FakeStrictRedis()
+        else:
+            self._client = Redis.from_url(redis_url)
 
     @property
     def client(self) -> Redis:
@@ -67,21 +77,31 @@ class RQ:
 
     Args:
         client (:obj:`~redis.Redis`, optional): The Redis client. Defaults to None.
+        test_mode (:obj:`bool`, optional): Whether the queue should be
+            in test mode. Defaults to False.
     """
 
-    def __init__(self, client: t.Optional[Redis] = None) -> None:
+    def __init__(
+        self, client: t.Optional[Redis] = None, test_mode: bool = False
+    ) -> None:
         self._queue: t.Optional[Queue] = None
+        self._test_mode: bool = test_mode
         if client:
-            self.init_queue(client)
+            self.init_queue(client, test_mode)
 
-    def init_queue(self, client: Redis) -> None:
+    def init_queue(self, client: Redis, test_mode: bool = False) -> None:
         """Initializes the Redis Queue with the given Redis client and a queue name
         of "GifSync".
 
         Args:
             client (:obj:`~redis.Redis`): The Redis client.
+            test_mode (:obj:`bool`, optional): Whether the queue should be
+                in test mode. Defaults to False.
         """
-        self._queue = Queue("GifSync", connection=client)
+        if test_mode:
+            self._queue = Queue("GifSync", is_async=False, connection=client)
+        else:
+            self._queue = Queue("GifSync", connection=client)
 
     @property
     def queue(self) -> Queue:
@@ -97,6 +117,15 @@ class RQ:
         if not self._queue:
             raise AttributeError("RQ Queue was not assigned yet!")
         return self._queue
+
+    @property
+    def test_mode(self) -> bool:
+        """Returns whether this Redis Queue is in test mode.
+
+        Returns:
+            :obj:`bool`: True if test mode enabled, otherwise False.
+        """
+        return self._test_mode
 
     def add_job(self, job: t.Callable, *args, **kwargs) -> Job:
         """Enqueues a job to the Redis Queue this wrapper contains.

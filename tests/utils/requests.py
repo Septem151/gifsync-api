@@ -339,3 +339,36 @@ def delete_gif(
         :obj:`~flask.Response`: The Flask Response object.
     """
     return _delete_request(client, f"/gifs/{gif_id}", auth_token)
+
+
+def sync_gif(
+    client: FlaskClient, gif_id: int, tempo: float, auth_token: t.Optional[str] = None
+) -> Response:
+    """POST /gifs/<gif_id>/sync
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        gif_id (:obj:`int`): The gif id.
+        tempo (:obj:`float`): The tempo to sync at.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _post_request(
+        client, f"/gifs/{gif_id}/sync", auth_token, {"tempo": tempo} if tempo else None
+    )
+
+
+def get_task(client: FlaskClient, task_id: str) -> Response:
+    """GET /tasks/<task_id>
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        task_id (:obj:`str`): Id of the task.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _get_request(client, f"/tasks/{task_id}")

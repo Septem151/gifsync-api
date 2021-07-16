@@ -46,8 +46,9 @@ def register_extensions(app: Flask) -> None:
     """
     auth_manager.init_app(app)
     cors.init_app(app)
-    redis_client.init_redis(app.config["REDIS_URL"])
-    rq_queue.init_queue(redis_client.client)
+    test_mode = app.config["CONFIG_TYPE"] == "testing"
+    redis_client.init_redis(app.config["REDIS_URL"], test_mode)
+    rq_queue.init_queue(redis_client.client, test_mode)
     db.init_app(app)
     s3.init_s3(
         access_key=app.config["AWS_ACCESS_KEY"],
