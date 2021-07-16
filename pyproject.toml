@@ -64,8 +64,8 @@ ignored-classes = "scoped_session, relationship"
 max-args = 6
 
 [tool.pylint.messages_control]
-# Disable bad-continuation, bad-whitespace, missing-module-docstring
-disable = "C0330, C0326"
+# Disable bad-continuation, bad-whitespace, missing-module-docstring, fixme
+disable = "C0330, C0326, W0511"
 
 [tool.pylint.format]
 max-line-length = "88"
