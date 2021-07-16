@@ -12,7 +12,16 @@ from .utils.generation import (
     populate_database_with_users,
     populate_users_with_gifs,
 )
-from .utils.requests import delete_gifs, get_gif, get_gifs, post_gifs
+from .utils.requests import (
+    delete_gif,
+    delete_gifs,
+    get_gif,
+    get_gifs,
+    get_task,
+    post_gif,
+    post_gifs,
+    sync_gif,
+)
 
 
 def test_get_gifs_non_admin(client: FlaskClient) -> None:
@@ -315,11 +324,11 @@ def test_get_gif_by_id_mismatch(client: FlaskClient, db_session) -> None:
 
     Args:
         client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
     """
     username = create_random_username()
     gif_name = create_random_username()
     populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
-    # added gif id will be 1
     other_username = create_random_username()
     auth_token = create_auth_token(other_username)
     gif = Gif.get_by_username_and_name(username, gif_name)
@@ -339,4 +348,342 @@ def test_get_gif_by_id_non_existent(client: FlaskClient) -> None:
     auth_token = create_auth_token(username)
     gif_id = 1
     response = get_gif(client, gif_id, auth_token.signed)
+    assert_error_response(response, HTTPStatus.NOT_FOUND)
+
+
+def test_post_gif_by_id_non_admin(client: FlaskClient, db_session) -> None:
+    """Assert when POST /gifs/<gif_id> is requested, that users with
+    matching username in auth token are allowed to make the request,
+    that the gif returned is updated, and that the gif is updated
+    in the database.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    auth_token = create_auth_token(username)
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    new_gif_data = {
+        "name": create_random_username(),
+        "beats_per_loop": 20,
+        "custom_tempo": 140,
+    }
+    response = post_gif(client, gif.id, new_gif_data, auth_token.signed)
+    assert response.status_code == HTTPStatus.OK
+    gif_data: t.Optional[dict] = response.get_json()
+    assert gif_data is not None
+    assert "id" in gif_data
+    assert "name" in gif_data
+    assert "owner" in gif_data
+    assert "beats_per_loop" in gif_data
+    assert "custom_tempo" in gif_data
+    assert "image" in gif_data
+    assert "image_url" in gif_data
+    # Gif response matches the updated gif values
+    assert gif_data["name"] == new_gif_data["name"]
+    assert gif_data["beats_per_loop"] == new_gif_data["beats_per_loop"]
+    assert gif_data["custom_tempo"] == new_gif_data["custom_tempo"]
+    # Gif response matches the gif in database
+    db_gif = Gif.get_by_id(gif_data["id"])
+    assert db_gif is not None
+    assert gif_data["name"] == db_gif.name
+    assert gif_data["owner"] == db_gif.owner.username
+    assert gif_data["beats_per_loop"] == db_gif.beats_per_loop
+    assert gif_data["custom_tempo"] == db_gif.custom_tempo
+    assert gif_data["image"] == db_gif.image
+
+
+def test_post_gif_by_id_unauthenticated(client: FlaskClient) -> None:
+    """Assert when POST /gifs/<gif_id> is requested, that unauthenticated
+    users are not allowed to make the request.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    gif_id = 1
+    response = post_gif(client, gif_id)
+    assert_error_response(response, HTTPStatus.UNAUTHORIZED)
+
+
+def test_post_gif_by_id_admin(client: FlaskClient, db_session) -> None:
+    """Assert when POST /gifs/<gif_id> is requested, that admin users
+    are allowed to make the request, that the gif returned is updated,
+    and that the gif is updated in the database.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    admin_username = create_random_username()
+    auth_token = create_auth_token(admin_username, admin=True)
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    new_gif_data = {
+        "name": create_random_username(),
+        "beats_per_loop": 20,
+        "custom_tempo": 140,
+    }
+    response = post_gif(client, gif.id, new_gif_data, auth_token.signed)
+    assert response.status_code == HTTPStatus.OK
+    gif_data: t.Optional[dict] = response.get_json()
+    assert gif_data is not None
+    assert "id" in gif_data
+    assert "name" in gif_data
+    assert "owner" in gif_data
+    assert "beats_per_loop" in gif_data
+    assert "custom_tempo" in gif_data
+    assert "image" in gif_data
+    assert "image_url" in gif_data
+    # Gif response matches the updated gif values
+    assert gif_data["name"] == new_gif_data["name"]
+    assert gif_data["beats_per_loop"] == new_gif_data["beats_per_loop"]
+    assert gif_data["custom_tempo"] == new_gif_data["custom_tempo"]
+    # Gif response matches the gif in database
+    db_gif = Gif.get_by_id(gif_data["id"])
+    assert db_gif is not None
+    assert gif_data["name"] == db_gif.name
+    assert gif_data["owner"] == db_gif.owner.username
+    assert gif_data["beats_per_loop"] == db_gif.beats_per_loop
+    assert gif_data["custom_tempo"] == db_gif.custom_tempo
+    assert gif_data["image"] == db_gif.image
+
+
+def test_post_gif_by_id_mismatch(client: FlaskClient, db_session) -> None:
+    """Assert when POST /gifs/<gif_id> is requested, that users with
+    mismatching username in auth token are not allowed to make the request.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    other_username = create_random_username()
+    auth_token = create_auth_token(other_username)
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    response = post_gif(client, gif.id, auth_token=auth_token.signed)
+    assert_error_response(response, HTTPStatus.FORBIDDEN)
+
+
+def test_post_gif_by_id_non_existent(client: FlaskClient) -> None:
+    """Assert when POST /gifs/<gif_id> is requested, that authenticated
+    requests to non-existent gifs gives 404.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    username = create_random_username()
+    auth_token = create_auth_token(username)
+    gif_id = 1
+    response = post_gif(client, gif_id, auth_token=auth_token.signed)
+    assert_error_response(response, HTTPStatus.NOT_FOUND)
+
+
+def test_delete_gif_by_id_non_admin(client: FlaskClient, db_session) -> None:
+    """Assert when DELETE /gifs/<gif_id> is requested, that users with
+    matching username in auth token are allowed to make the request,
+    that the gif is deleted from the database.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    auth_token = create_auth_token(username)
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    gif_id = gif.id
+    response = delete_gif(client, gif_id, auth_token.signed)
+    assert response.status_code == HTTPStatus.NO_CONTENT
+    assert response.content_length is None
+    assert Gif.get_by_id(gif_id) is None
+
+
+def test_delete_gif_by_id_unauthenticated(client: FlaskClient) -> None:
+    """Assert when DELETE /gifs/<gif_id> is requested, that unauthenticated
+    users are not allowed to make the request.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    gif_id = 1
+    response = delete_gif(client, gif_id)
+    assert_error_response(response, HTTPStatus.UNAUTHORIZED)
+
+
+def test_delete_gif_by_id_admin(client: FlaskClient, db_session) -> None:
+    """Assert when DELETE /gifs/<gif_id> is requested, that admin users
+    are allowed to make the request, and that the gif is deleted from
+    the database.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    admin_username = create_random_username()
+    auth_token = create_auth_token(admin_username, admin=True)
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    gif_id = gif.id
+    response = delete_gif(client, gif_id, auth_token.signed)
+    assert response.status_code == HTTPStatus.NO_CONTENT
+    assert response.content_length is None
+    assert Gif.get_by_id(gif_id) is None
+
+
+def test_delete_gif_by_id_mismatch(client: FlaskClient, db_session) -> None:
+    """Assert when DELETE /gifs/<gif_id> is requested, that users with
+    mismatching username in auth token are not allowed to make the request.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    other_username = create_random_username()
+    auth_token = create_auth_token(other_username)
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    response = delete_gif(client, gif.id, auth_token=auth_token.signed)
+    assert_error_response(response, HTTPStatus.FORBIDDEN)
+
+
+def test_delete_gif_by_id_non_existent(client: FlaskClient) -> None:
+    """Assert when DELETE /gifs/<gif_id> is requested, that authenticated
+    requests to non-existent gifs gives 404.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    username = create_random_username()
+    auth_token = create_auth_token(username)
+    gif_id = 1
+    response = delete_gif(client, gif_id, auth_token=auth_token.signed)
+    assert_error_response(response, HTTPStatus.NOT_FOUND)
+
+
+def test_sync_gif_by_id_non_admin(client: FlaskClient, db_session) -> None:
+    """Assert when POST /gifs/<gif_id>/sync is requested, that users with
+    matching username in auth token are allowed to make the request,
+    and that the sync task completes successfully.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    auth_token = create_auth_token(username)
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    gif_id = gif.id
+    tempo = 140
+    response = sync_gif(client, gif_id, tempo, auth_token.signed)
+    assert response.status_code == HTTPStatus.OK
+    resp_json: t.Optional[dict] = response.get_json()
+    assert resp_json is not None
+    assert "task_id" in resp_json
+    # In testing mode, rq completes the task synchronously,
+    # so when we make this call, it should be finished already.
+    response = get_task(client, resp_json["task_id"])
+    resp_json = response.get_json()
+    assert resp_json is not None
+    assert "id" in resp_json
+    assert "complete" in resp_json
+
+
+def test_sync_gif_by_id_unauthenticated(client: FlaskClient) -> None:
+    """Assert when POST /gifs/<gif_id>/sync is requested, that unauthenticated
+    users are not allowed to make the request.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    gif_id = 1
+    tempo = 140
+    response = sync_gif(client, gif_id, tempo)
+    assert_error_response(response, HTTPStatus.UNAUTHORIZED)
+
+
+def test_sync_gif_by_id_admin(client: FlaskClient, db_session) -> None:
+    """Assert when POST /gifs/<gif_id>/sync is requested, that admin users
+    are allowed to make the request, and that the sync task completes
+    successfully.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    admin_username = create_random_username()
+    auth_token = create_auth_token(admin_username, admin=True)
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    gif_id = gif.id
+    tempo = 140
+    response = sync_gif(client, gif_id, tempo, auth_token.signed)
+    assert response.status_code == HTTPStatus.OK
+    resp_json: t.Optional[dict] = response.get_json()
+    assert resp_json is not None
+    assert "task_id" in resp_json
+    # In testing mode, rq completes the task synchronously,
+    # so when we make this call, it should be finished already.
+    response = get_task(client, resp_json["task_id"])
+    resp_json = response.get_json()
+    assert resp_json is not None
+    assert "id" in resp_json
+    assert "complete" in resp_json
+
+
+def test_sync_gif_by_id_mismatch(client: FlaskClient, db_session) -> None:
+    """Assert when POST /gifs/<gif_id>/sync is requested, that users with
+    mismatching username in auth token are not allowed to make the request.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        db_session: The Database session fixture.
+    """
+    username = create_random_username()
+    gif_name = create_random_username()
+    populate_users_with_gifs(db_session, extra_user_gif=(username, gif_name))
+    other_username = create_random_username()
+    auth_token = create_auth_token(other_username)
+    gif = Gif.get_by_username_and_name(username, gif_name)
+    assert gif is not None
+    tempo = 140
+    response = sync_gif(client, gif.id, tempo, auth_token=auth_token.signed)
+    assert_error_response(response, HTTPStatus.FORBIDDEN)
+
+
+def test_sync_gif_by_id_non_existent(client: FlaskClient) -> None:
+    """Assert when POST /gifs/<gif_id>/sync is requested, that authenticated
+    requests to non-existent gifs gives 404.
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+    """
+    username = create_random_username()
+    auth_token = create_auth_token(username)
+    gif_id = 1
+    tempo = 140
+    response = sync_gif(client, gif_id, tempo, auth_token.signed)
     assert_error_response(response, HTTPStatus.NOT_FOUND)

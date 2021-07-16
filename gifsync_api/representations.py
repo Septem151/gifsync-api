@@ -162,3 +162,14 @@ class Task:
             :obj:`bool`: Whether the task is completed or not.
         """
         return self._complete
+
+    def to_json(self) -> dict:
+        """The json representation of a Task.
+
+        Returns:
+            :obj:`dict`: Task represented in JSON format.
+        """
+        return {
+            "id": self.task_id,
+            "complete": self.complete,
+        }

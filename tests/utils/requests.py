@@ -301,3 +301,74 @@ def get_gif(
         :obj:`~flask.Response`: The Flask Response object.
     """
     return _get_request(client, f"/gifs/{gif_id}", auth_token)
+
+
+def post_gif(
+    client: FlaskClient,
+    gif_id: int,
+    gif_data: t.Optional[dict] = None,
+    auth_token: t.Optional[str] = None,
+) -> Response:
+    """POST /gifs/<gif_id>
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        gif_id (:obj:`int`): The gif id.
+        gif_data (:obj:`dict`, optional): The new gif's data. Defaults to None.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _post_request(client, f"/gifs/{gif_id}", auth_token, gif_data)
+
+
+def delete_gif(
+    client: FlaskClient, gif_id: int, auth_token: t.Optional[str] = None
+) -> Response:
+    """DELETE /gifs/<gif_id>
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        gif_id (:obj:`int`): The gif id.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _delete_request(client, f"/gifs/{gif_id}", auth_token)
+
+
+def sync_gif(
+    client: FlaskClient, gif_id: int, tempo: float, auth_token: t.Optional[str] = None
+) -> Response:
+    """POST /gifs/<gif_id>/sync
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        gif_id (:obj:`int`): The gif id.
+        tempo (:obj:`float`): The tempo to sync at.
+        auth_token (:obj:`str`, optional): Auth token for the Authorization header.
+            Defaults to None.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _post_request(
+        client, f"/gifs/{gif_id}/sync", auth_token, {"tempo": tempo} if tempo else None
+    )
+
+
+def get_task(client: FlaskClient, task_id: str) -> Response:
+    """GET /tasks/<task_id>
+
+    Args:
+        client (:obj:`~flask.testing.FlaskClient`): The Client fixture.
+        task_id (:obj:`str`): Id of the task.
+
+    Returns:
+        :obj:`~flask.Response`: The Flask Response object.
+    """
+    return _get_request(client, f"/tasks/{task_id}")

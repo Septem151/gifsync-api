@@ -131,7 +131,7 @@ def populate_database_with_users(
         extra_username (:obj:`str`): An optional extra user to create with the
             given username.
     """
-    for _ in range(0, 10):
+    for _ in range(0, 3):
         username = create_random_username()
         db_session.add(GifSyncUser(username=username))
     if extra_username:
@@ -157,7 +157,7 @@ def populate_users_with_gifs(
         test_image_path = pathlib.Path(__file__).parent.resolve() / "test-image.gif"
         with open(test_image_path, "rb") as image_file:
             image_bytes = image_file.read()
-            for _ in range(0, 4):
+            for _ in range(0, 2):
                 image_name = s3.add_image(image_bytes)
                 gif = Gif(
                     name=create_random_username(),

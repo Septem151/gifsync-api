@@ -7,12 +7,15 @@ import subprocess
 import typing as t
 
 import boto3
+from botocore.exceptions import ClientError
+from fakeredis import FakeStrictRedis
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_pyjwt import AuthManager
 from flask_sqlalchemy import SQLAlchemy
 from mypy_boto3_s3.client import S3Client
 from mypy_boto3_s3.service_resource import Bucket, S3ServiceResource
+from mypy_boto3_s3.type_defs import DeleteObjectsOutputTypeDef, GetObjectOutputTypeDef
 from redis import Redis
 from rq import Queue
 from rq.command import send_stop_job_command
@@ -25,22 +28,31 @@ class RedisClient:
     Args:
         redis_url (:obj:`str`, optional): The Redis connection string.
             Ex: "redis://localhost:6379/0". Defaults to None.
+        test_mode (:obj:`bool`, optional): Whether the redis client should be
+            in test mode. Defaults to False.
     """
 
-    def __init__(self, redis_url: t.Optional[str] = None) -> None:
+    def __init__(
+        self, redis_url: t.Optional[str] = None, test_mode: bool = False
+    ) -> None:
 
         self._client: t.Optional[Redis] = None
         if redis_url:
-            self.init_redis(redis_url)
+            self.init_redis(redis_url, test_mode)
 
-    def init_redis(self, redis_url: str) -> None:
+    def init_redis(self, redis_url: str, test_mode: bool = False) -> None:
         """Initializes the Redis client with the given connection string.
 
         Args:
             redis_url (:obj:`str`): The Redis connection string.
                 Ex: "redis://localhost:6379/0"
+            test_mode (:obj:`bool`, optional): Whether the redis client should
+                be in test mode. Defaults to False.
         """
-        self._client = Redis.from_url(redis_url)
+        if test_mode:
+            self._client = FakeStrictRedis()
+        else:
+            self._client = Redis.from_url(redis_url)
 
     @property
     def client(self) -> Redis:
@@ -65,21 +77,31 @@ class RQ:
 
     Args:
         client (:obj:`~redis.Redis`, optional): The Redis client. Defaults to None.
+        test_mode (:obj:`bool`, optional): Whether the queue should be
+            in test mode. Defaults to False.
     """
 
-    def __init__(self, client: t.Optional[Redis] = None) -> None:
+    def __init__(
+        self, client: t.Optional[Redis] = None, test_mode: bool = False
+    ) -> None:
         self._queue: t.Optional[Queue] = None
+        self._test_mode: bool = test_mode
         if client:
-            self.init_queue(client)
+            self.init_queue(client, test_mode)
 
-    def init_queue(self, client: Redis) -> None:
+    def init_queue(self, client: Redis, test_mode: bool = False) -> None:
         """Initializes the Redis Queue with the given Redis client and a queue name
         of "GifSync".
 
         Args:
             client (:obj:`~redis.Redis`): The Redis client.
+            test_mode (:obj:`bool`, optional): Whether the queue should be
+                in test mode. Defaults to False.
         """
-        self._queue = Queue("GifSync", connection=client)
+        if test_mode:
+            self._queue = Queue("GifSync", is_async=False, connection=client)
+        else:
+            self._queue = Queue("GifSync", connection=client)
 
     @property
     def queue(self) -> Queue:
@@ -95,6 +117,15 @@ class RQ:
         if not self._queue:
             raise AttributeError("RQ Queue was not assigned yet!")
         return self._queue
+
+    @property
+    def test_mode(self) -> bool:
+        """Returns whether this Redis Queue is in test mode.
+
+        Returns:
+            :obj:`bool`: True if test mode enabled, otherwise False.
+        """
+        return self._test_mode
 
     def add_job(self, job: t.Callable, *args, **kwargs) -> Job:
         """Enqueues a job to the Redis Queue this wrapper contains.
@@ -284,6 +315,9 @@ class S3:
         Args:
             image_data (:obj:`bytes`): Bytes encoded image.
 
+        Raises:
+            :obj:`RuntimeError`: If gifsicle could not make a thumbnail.
+
         Returns:
             :obj:`str`: Name of the image in the S3 bucket.
         """
@@ -302,6 +336,62 @@ class S3:
             # TODO: Handle error better by logging rather than crashing
             raise RuntimeError("Could not make thumbnail") from error
         return image_name
+
+    def update_image(self, image_name: str, image_data: bytes) -> bool:
+        """Updates an existing image in the S3 bucket, if there is one.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+            image_data (:obj:`bytes`): Bytes encoded image.
+
+        Returns:
+            True if the image existed and was updated, otherwise False.
+        """
+        try:
+            s3_object = self.bucket.Object(f"{image_name}.gif")
+            s3_object.load()
+            self.bucket.put_object(Key=f"{image_name}.gif", Body=image_data)
+        except ClientError:
+            return False
+        return True
+
+    def get_image(self, image_name: str) -> t.Optional[bytes]:
+        """Gets an image as bytes from the S3 bucket, if it exists.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+
+        Returns:
+            :obj:`bytes`: The image bytes if exists, else None.
+        """
+        try:
+            s3_object = self.bucket.Object(f"{image_name}.gif")
+            s3_image: GetObjectOutputTypeDef = s3_object.get()
+            image_bytes = s3_image["Body"].read()
+            return image_bytes
+        except ClientError:
+            return None
+
+    def delete_image(self, image_name: str) -> DeleteObjectsOutputTypeDef:
+        """Deletes an image (and its thumbnail) if it exists from the S3 bucket.
+
+        Args:
+            image_name (:obj:`str`): Name of the image in the S3 bucket.
+
+        Returns:
+            :obj:`~mypy_boto3_s3.type_defs.DeleteObjectsOutputTypeDef`: Response
+                from S3 about the result of the deletion.
+        """
+        response: DeleteObjectsOutputTypeDef = self.bucket.delete_objects(
+            Delete={
+                "Objects": [
+                    {"Key": f"{image_name}.gif"},
+                    {"Key": f"thumbs/{image_name}.gif"},
+                ],
+                "Quiet": True,
+            }
+        )
+        return response
 
     def get_image_url(self, image_name: str) -> str:
         """Gets a presigned URL for an image from the S3 bucket.

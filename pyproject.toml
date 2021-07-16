@@ -19,17 +19,19 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.8"
 python-dotenv = "^0.17.1"
+requests = "^2.25.1"
 Flask = "^1.1.4"
 Flask-Cors = "^3.0.10"
-flask-pyjwt = "^0.1.8" 
-requests = "^2.25.1"
-redis = "^3.5.3"
-rq = "^1.8.1"
-psycopg2 = { version = "^2.9", optional = true }
-psycopg2-binary = { version = "^2.9", optional = true }
+flask-pyjwt = "^0.1.8"
 Flask-SQLAlchemy = "^2.5.1"
 Flask-Migrate = "^3.0.1"
+redis = "^3.5.3"
+rq = "^1.8.1"
+fakeredis = "^1.5.2"
+psycopg2 = { version = "^2.9", optional = true }
+psycopg2-binary = { version = "^2.9", optional = true }
 boto3 = {extras = ["s3"], version = "^1.17.107"}
+boto3-stubs = {extras = ["s3"], version = "^1.17.106"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -39,7 +41,6 @@ pylint = "^2.8.2"
 isort = "^5.8.0"
 Sphinx = "^4.0.1"
 pylint-flask-sqlalchemy = "^0.2.0"
-boto3-stubs = {extras = ["s3"], version = "^1.17.106"}
 moto = {extras = ["s3"], version = "^2.0.11"}
 
 [tool.poetry.extras]
@@ -63,8 +64,8 @@ ignored-classes = "scoped_session, relationship"
 max-args = 6
 
 [tool.pylint.messages_control]
-# Disable bad-continuation, bad-whitespace, missing-module-docstring
-disable = "C0330, C0326"
+# Disable bad-continuation, bad-whitespace, missing-module-docstring, fixme
+disable = "C0330, C0326, W0511"
 
 [tool.pylint.format]
 max-line-length = "88"
