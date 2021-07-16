@@ -31,7 +31,7 @@ jobs:
           cd /tmp/gifsicle-1.93
           ./configure --disable-gifview --disable-gifdiff
           make
-          make install
+          sudo make install
 
       - uses: actions/checkout@v2
 
