@@ -30,7 +30,7 @@ jobs:
         env:
           cache-name: cache-gifsicle
         with:
-          path: /usr/local/bin/gifsicle
+          path: ~/.local/bin/gifsicle
           key: ${{ runner.os }}-build-${{ env.cache-name }}-1.93
 
       - name: Install gifsicle 1.93
@@ -42,6 +42,17 @@ jobs:
           ./configure --disable-gifview --disable-gifdiff
           make
           sudo make install
+          mkdir -p ~/.local/bin
+          cp /usr/local/bin/gifsicle ~/.local/bin
+
+      - name: Symlink gifsicle
+        if: steps.cache-gifsicle.outputs.cache-hit == 'true'
+        run: |
+          sudo ln -s ~/.local/bin/gifsicle /usr/local/bin/gifsicle
+
+      - name: Test existence of gifsicle
+        run: |
+          gifsicle --version
 
       - uses: actions/checkout@v2
 
