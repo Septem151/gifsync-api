@@ -24,7 +24,17 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Install gifsicle
+      - name: Cache gifsicle
+        id: cache-gifsicle
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-gifsicle
+        with:
+          path: /usr/local/bin/gifsicle
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-1.93
+
+      - name: Install gifsicle 1.93
+        if: steps.cache-gifsicle.outputs.cache-hit != 'true'
         run: |
           wget -c http://www.lcdf.org/gifsicle/gifsicle-1.93.tar.gz -O - \
           | tar -xz -C /tmp
